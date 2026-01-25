@@ -233,6 +233,13 @@
             0% { opacity: 1; transform: translateY(0) scale(1); }
             100% { opacity: 0; transform: translateY(-60px) scale(1.3); }
         }
+        
+        .no-fusion-msg {
+            color: rgba(180, 180, 190, 0.6);
+            font-size: 0.75rem;
+            text-align: center;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -251,6 +258,7 @@
                 <div style="display: flex; gap: 12px; align-items: center;">
                     <button id="points-anim-toggle" class="points-toggle" title="Animation des points">✨</button>
                     <button id="twin-toggle" class="points-toggle" title="Fusions Jumeaux">👯</button>
+                    <button id="keep-state-toggle" class="points-toggle" title="Conserver état au respawn">🔄</button>
                     
                     <div style="display: flex; gap: 4px; align-items: center;">
                         <span class="stat-icon" style="color: #22d3ee;">💎</span>
@@ -312,6 +320,8 @@
         </div>
     </div>
     
+    <div id="no-fusion-msg" class="no-fusion-msg"></div>
+    
     <!-- Panneau de notes -->
     <div class="notes-panel" id="notes-panel">
         <div class="notes-content">
@@ -349,6 +359,7 @@
         
         let showPointsAnimation = true;
         let enableTwinFusion = false;
+        let keepStateOnRespawn = false;
         
         const ICONS = {
             // Sigles niveau 1, 3, 4 (originaux)
@@ -1117,9 +1128,79 @@
             
             lastMovedIndices = [];
             
+            // Vérifier si des fusions sont encore possibles
+            checkNoFusionPossible();
+            
             if (!skipGravity) {
                 applyGravity();
             }
+        }
+        
+        function checkNoFusionPossible() {
+            const msgEl = document.getElementById('no-fusion-msg');
+            
+            // Twin fusion check
+            if (enableTwinFusion) {
+                for (let i = 0; i < TOTAL; i++) {
+                    if (!dominos[i]) continue;
+                    const { x, y } = getPos(i);
+                    const iR = getIndex(x+1, y);
+                    if (iR !== -1 && areTwins(dominos[i], dominos[iR])) { msgEl.textContent = ''; return; }
+                    const iB = getIndex(x, y+1);
+                    if (iB !== -1 && areTwins(dominos[i], dominos[iB])) { msgEl.textContent = ''; return; }
+                }
+            }
+            
+            // Chain fusion check
+            for (let i = 0; i < TOTAL; i++) {
+                if (!dominos[i]) continue;
+                const { x, y } = getPos(i);
+                if (x > 0 && x < COLS-1) {
+                    const iL = getIndex(x-1,y), iR = getIndex(x+1,y);
+                    if (iL !== -1 && iR !== -1 && dominos[iL] && dominos[iR]) {
+                        const fLR = getExposedFace(dominos[iL], 'right'), fCL = getExposedFace(dominos[i], 'left');
+                        const fCR = getExposedFace(dominos[i], 'right'), fRL = getExposedFace(dominos[iR], 'left');
+                        const sLR = getExposedState(dominos[iL], 'right'), sCL = getExposedState(dominos[i], 'left');
+                        const sCR = getExposedState(dominos[i], 'right'), sRL = getExposedState(dominos[iR], 'left');
+                        if (fLR && fCL && fLR === fCL && sLR === sCL && fCR && fRL && fCR === fRL && sCR === sRL) { 
+                            msgEl.textContent = ''; return; 
+                        }
+                    }
+                }
+                if (y > 0 && y < ROWS-1) {
+                    const iT = getIndex(x,y-1), iB = getIndex(x,y+1);
+                    if (iT !== -1 && iB !== -1 && dominos[iT] && dominos[iB]) {
+                        const fTB = getExposedFace(dominos[iT], 'bottom'), fCT = getExposedFace(dominos[i], 'top');
+                        const fCB = getExposedFace(dominos[i], 'bottom'), fBT = getExposedFace(dominos[iB], 'top');
+                        const sTB = getExposedState(dominos[iT], 'bottom'), sCT = getExposedState(dominos[i], 'top');
+                        const sCB = getExposedState(dominos[i], 'bottom'), sBT = getExposedState(dominos[iB], 'top');
+                        if (fTB && fCT && fTB === fCT && sTB === sCT && fCB && fBT && fCB === fBT && sCB === sBT) { 
+                            msgEl.textContent = ''; return; 
+                        }
+                    }
+                }
+            }
+            
+            // Simple fusion check
+            for (let i = 0; i < TOTAL; i++) {
+                if (!dominos[i]) continue;
+                const { x, y } = getPos(i);
+                const iR = getIndex(x+1, y);
+                if (iR !== -1 && dominos[iR]) {
+                    const fL = getExposedFace(dominos[i], 'right'), fR = getExposedFace(dominos[iR], 'left');
+                    const sL = getExposedState(dominos[i], 'right'), sR = getExposedState(dominos[iR], 'left');
+                    if (fL && fR && fL === fR && sL === sR) { msgEl.textContent = ''; return; }
+                }
+                const iB = getIndex(x, y+1);
+                if (iB !== -1 && dominos[iB]) {
+                    const fT = getExposedFace(dominos[i], 'bottom'), fB = getExposedFace(dominos[iB], 'top');
+                    const sT = getExposedState(dominos[i], 'bottom'), sB = getExposedState(dominos[iB], 'top');
+                    if (fT && fB && fT === fB && sT === sB) { msgEl.textContent = ''; return; }
+                }
+            }
+            
+            // Aucune fusion possible
+            msgEl.textContent = 'Aucune fusion possible';
         }
 
         function performSimpleFusion(idx1, idx2, dir) {
@@ -1144,12 +1225,15 @@
             const nextStateIdx = Math.min(currentStateIdx + 1, STATE_ORDER.length - 1);
             const partnerState = STATE_ORDER[nextStateIdx];
             
-            // Le domino jumeau (les 2 faces qui ont fusionné) reviendra en blanc
+            // Le domino jumeau (les 2 faces qui ont fusionné) reviendra selon option
+            const twinState = keepStateOnRespawn ? currentState : 'white';
             const twinDomino = {
                 face1: fusionFace1,
                 face2: fusionFace2,
                 rotation: 0,
-                state: 'white'
+                state: twinState,
+                state1: twinState,
+                state2: twinState
             };
             
             // Comptage des fusions par état atteint
@@ -1213,10 +1297,11 @@
             const nextStateIdx = Math.min(currentStateIdx + 2, STATE_ORDER.length - 1);
             const partnerState = STATE_ORDER[nextStateIdx];
             
-            // 2 dominos jumeaux (les 2 paires de faces qui ont fusionné) reviendront en blanc
+            // 2 dominos jumeaux (les 2 paires de faces qui ont fusionné) selon option
+            const twinState = keepStateOnRespawn ? currentState : 'white';
             const twinDominos = [
-                { face1: fusionFace1, face2: fusionFace1, rotation: 0, state: 'white' },
-                { face1: fusionFace2, face2: fusionFace2, rotation: 0, state: 'white' }
+                { face1: fusionFace1, face2: fusionFace1, rotation: 0, state: twinState, state1: twinState, state2: twinState },
+                { face1: fusionFace2, face2: fusionFace2, rotation: 0, state: twinState, state1: twinState, state2: twinState }
             ];
             
             // Comptage des fusions
@@ -1409,6 +1494,7 @@
             document.getElementById('emerald-count').textContent = '0';
             document.getElementById('cosmic-count').textContent = '0';
             document.getElementById('supernovae-count').textContent = '0';
+            document.getElementById('no-fusion-msg').textContent = '';
         }
         
         function setLevel(level) {
@@ -1436,6 +1522,13 @@
             btn.classList.toggle('active', enableTwinFusion);
             try { localStorage.setItem('adam_twin_fusion', enableTwinFusion.toString()); } catch(e) {}
         }
+        
+        function toggleKeepState() {
+            keepStateOnRespawn = !keepStateOnRespawn;
+            const btn = document.getElementById('keep-state-toggle');
+            btn.classList.toggle('active', keepStateOnRespawn);
+            try { localStorage.setItem('adam_keep_state', keepStateOnRespawn.toString()); } catch(e) {}
+        }
 
         // Initialisation localStorage
         try { bestScore = parseInt(localStorage.getItem('adam_best') || '0'); document.getElementById('best').textContent = bestScore.toLocaleString(); } catch(e) {}
@@ -1455,11 +1548,19 @@
                 if (enableTwinFusion) document.getElementById('twin-toggle').classList.add('active');
             }
         } catch(e) {}
+        try { 
+            const savedKeepState = localStorage.getItem('adam_keep_state');
+            if (savedKeepState !== null) {
+                keepStateOnRespawn = savedKeepState === 'true';
+                if (keepStateOnRespawn) document.getElementById('keep-state-toggle').classList.add('active');
+            }
+        } catch(e) {}
         setInterval(() => { try { localStorage.setItem('adam_best', bestScore.toString()); } catch(e) {} }, 5000);
 
         // Event listeners
         document.getElementById('points-anim-toggle').addEventListener('click', togglePointsAnimation);
         document.getElementById('twin-toggle').addEventListener('click', toggleTwinFusion);
+        document.getElementById('keep-state-toggle').addEventListener('click', toggleKeepState);
         
         grid.addEventListener('mousedown', startDrag);
         grid.addEventListener('touchstart', startDrag, { passive: false });
