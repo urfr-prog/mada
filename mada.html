@@ -18,10 +18,23 @@
 
         /* ═══ BOTTOM BAR ═══ */
         .bottom-bar {
-            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            display: flex; flex-direction: column; align-items: center; gap: 0;
             width: calc(var(--cell) * 3 + var(--gap) * 2 + 40px);
-            position: fixed; bottom: calc(8px + env(safe-area-inset-bottom, 12px)); left: 50%; transform: translateX(-50%);
+            position: fixed; bottom: calc(4px + env(safe-area-inset-bottom, 12px)); left: 50%; transform: translateX(-50%);
         }
+        .bottom-toggle {
+            width: 36px; height: 14px; display: flex; align-items: center; justify-content: center;
+            background: transparent; border: none; cursor: pointer; padding: 0;
+            color: rgba(180,180,190,0.25); font-size: 10px; transition: color 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .bottom-toggle:hover { color: rgba(180,180,190,0.5); }
+        .bottom-toggle.open { color: rgba(180,180,190,0.4); }
+        .bottom-menu {
+            display: none; flex-direction: column; align-items: center; gap: 6px;
+            width: 100%; padding-bottom: 4px;
+        }
+        .bottom-menu.open { display: flex; }
         .bottom-row {
             display: flex; align-items: center; justify-content: center; gap: 8px;
             width: 100%;
@@ -76,23 +89,6 @@
         }
         .settings-layer.active { display: block; }
 
-        /* ═══ MIRROR ═══ */
-        .mirror-container {
-            display: none; position: fixed;
-            left: calc(50% + (var(--cell) * 3 + var(--gap) * 2) / 2 + var(--cell));
-            top: 50%; transform: translateY(-50%);
-            width: calc(var(--cell) * 3 + var(--gap) * 2);
-            height: calc(var(--cell) * 3 + var(--gap) * 2);
-        }
-        .mirror-container .grid-mirror { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .mirror-container .domino { cursor: default; pointer-events: none; }
-        .mirror-container .domino.empty .face { border-color: rgba(40,40,50,0.08); }
-        .mirror-container .domino.cell-flipped { }
-        .mirror-container::before {
-            content: 'FACE'; position: absolute; top: -24px; left: 50%; transform: translateX(-50%);
-            font-size: 0.7rem; color: rgba(200,200,210,0.6); letter-spacing: 0.1em;
-        }
-        @media (min-width: 800px) { .mirror-container { display: block; } }
 
         /* ═══ DOMINO CONTAINER ═══ */
         .cell {
@@ -298,28 +294,28 @@
         </div>
     </div>
 
-    <div class="mirror-container" id="mirror-container">
-        <div class="grid-mirror" id="grid-mirror"></div>
-    </div>
 
     <div class="bottom-bar">
-        <div class="bottom-row">
-            <button class="action-btn" onclick="toggleMenu()">Menu</button>
-            <button class="action-btn" onclick="undo()">Undo</button>
-            <button class="action-btn" onclick="flipAll()">Flip</button>
-            <button class="action-btn" onclick="toggleNumbers()" id="nb-btn">nb</button>
+        <div class="bottom-menu" id="bottom-menu">
+            <div class="bottom-row">
+                <button class="action-btn" onclick="toggleMenu()">Menu</button>
+                <button class="action-btn" onclick="undo()">Undo</button>
+                <button class="action-btn" onclick="flipAll()">Flip</button>
+                <button class="action-btn" onclick="toggleNumbers()" id="nb-btn">nb</button>
+            </div>
+            <div class="bottom-row">
+                <button class="action-btn" onclick="toggleBackLayer()" id="bl-btn">👁</button>
+                <button class="action-btn" onclick="toggleRespawn()" id="respawn-btn">♻️</button>
+                <button class="action-btn" onclick="toggleDualState()" id="dual-btn">🎭</button>
+                <button class="action-btn" onclick="toggleInheritRespawn()" id="inherit-btn">🧬</button>
+            </div>
+            <div class="bottom-row" style="gap:6px;align-items:center;">
+                <span style="color:rgba(180,180,190,0.5);font-size:0.65rem;white-space:nowrap;">Bords</span>
+                <input type="range" id="border-slider" min="0" max="100" value="100" style="flex:1;height:20px;accent-color:#22d3ee;cursor:pointer;" oninput="setBorderOpacity(this.value)">
+                <span id="border-val" style="color:rgba(180,180,190,0.5);font-size:0.65rem;min-width:28px;text-align:right;">100%</span>
+            </div>
         </div>
-        <div class="bottom-row">
-            <button class="action-btn" onclick="toggleBackLayer()" id="bl-btn">👁</button>
-            <button class="action-btn" onclick="toggleRespawn()" id="respawn-btn">♻️</button>
-            <button class="action-btn" onclick="toggleDualState()" id="dual-btn">🎭</button>
-            <button class="action-btn" onclick="toggleInheritRespawn()" id="inherit-btn">🧬</button>
-        </div>
-        <div class="bottom-row" style="gap:6px;align-items:center;">
-            <span style="color:rgba(180,180,190,0.5);font-size:0.65rem;white-space:nowrap;">Bords</span>
-            <input type="range" id="border-slider" min="0" max="100" value="100" style="flex:1;height:20px;accent-color:#22d3ee;cursor:pointer;" oninput="setBorderOpacity(this.value)">
-            <span id="border-val" style="color:rgba(180,180,190,0.5);font-size:0.65rem;min-width:28px;text-align:right;">100%</span>
-        </div>
+        <button class="bottom-toggle" id="bottom-toggle" onclick="toggleBottomMenu()">━</button>
     </div>
 
     <div class="notes-panel" id="notes-panel">
@@ -389,8 +385,7 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
 
     // DOM
     const grid = document.getElementById('grid');
-    const gridMirror = document.getElementById('grid-mirror');
-    let dominoElements = [];  // Référence vers les .domino du DOM (index = cellIdx)
+    let dominoElements = [];
     let ghostElements = [];
 
     // Drag state
@@ -644,54 +639,6 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
             dominoElements.push(domEl);
         }
 
-        renderMirror();
-    }
-
-    // ============================================
-    // RENDU MIROIR
-    // ============================================
-    function renderMirror() {
-        if (!gridMirror) return;
-        gridMirror.innerHTML = '';
-
-        for (let i = 0; i < TOTAL; i++) {
-            const col = i % COLS;
-            const row = Math.floor(i / COLS);
-            const mirrorCol = (COLS - 1) - col;
-            const mirrorIdx = row * COLS + mirrorCol;
-
-            const cellEl = document.createElement('div');
-            cellEl.className = 'cell';
-            cellEl.dataset.mirrorOf = mirrorIdx;
-            cellEl.style.left = (col * CELL_TOTAL) + 'px';
-            cellEl.style.top = (row * CELL_TOTAL) + 'px';
-
-            const domEl = document.createElement('div');
-            const cell = cells[mirrorIdx];
-
-            if (cell) {
-                const state = getCellState(mirrorIdx);
-                const flippedClass = cell.flipped ? '' : ' cell-flipped';
-                domEl.className = `domino ${state}${flippedClass}`;
-
-                // Rotation miroir : toujours inversée (miroir physique)
-                const baseRot = cell.rotation || 0;
-                domEl.style.transform = `rotate(${-baseRot}deg)`;
-
-                // Miroir : même IDs, renderFaceHTML gère pile/face via isMirror
-                let topId = cell.topHalfId;
-                let bottomId = cell.bottomHalfId;
-
-                domEl.innerHTML = renderFaceHTML(topId, mirrorIdx, 'top', true) +
-                                  renderFaceHTML(bottomId, mirrorIdx, 'bottom', true);
-            } else {
-                domEl.className = 'domino empty';
-                domEl.innerHTML = '<div class="face top"></div><div class="face bottom"></div>';
-            }
-
-            cellEl.appendChild(domEl);
-            gridMirror.appendChild(cellEl);
-        }
     }
 
     // ============================================
@@ -705,32 +652,11 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
         cell.rotation += clockwise ? 90 : -90;
         lastMovedIndices = [cellIdx];
 
-        // Animation smooth via CSS
         const el = dominoElements[cellIdx];
         if (el) {
             el.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
             el.style.transform = `rotate(${cell.rotation}deg)`;
-            // Sync miroir
-            updateMirrorRotation(cellIdx);
             setTimeout(() => checkFusions(), 300);
-        }
-    }
-
-    function updateMirrorRotation(cellIdx) {
-        if (!gridMirror) return;
-        const cell = cells[cellIdx];
-        if (!cell) return;
-        const mirrorRot = -cell.rotation;
-        const mirrorCells = gridMirror.children;
-        for (let i = 0; i < mirrorCells.length; i++) {
-            if (parseInt(mirrorCells[i].dataset.mirrorOf) === cellIdx) {
-                const domEl = mirrorCells[i].querySelector('.domino');
-                if (domEl) {
-                    domEl.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-                    domEl.style.transform = `rotate(${mirrorRot}deg)`;
-                }
-                break;
-            }
         }
     }
 
@@ -745,10 +671,17 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
                 const cell = cells[idx];
                 if (!cell) continue;
                 const state = getCellState(idx);
-                // Ghost gauche
                 addGhost(cell, state, idx, c * CELL_TOTAL - COLS * CELL_TOTAL, rowOrCol * CELL_TOTAL, 'x');
-                // Ghost droite
                 addGhost(cell, state, idx, c * CELL_TOTAL + COLS * CELL_TOTAL, rowOrCol * CELL_TOTAL, 'x');
+            }
+        } else if (axis === 'vertical') {
+            for (let r = 0; r < ROWS; r++) {
+                const idx = r * COLS + rowOrCol;
+                const cell = cells[idx];
+                if (!cell) continue;
+                const state = getCellState(idx);
+                addGhost(cell, state, idx, rowOrCol * CELL_TOTAL, r * CELL_TOTAL - ROWS * CELL_TOTAL, 'y');
+                addGhost(cell, state, idx, rowOrCol * CELL_TOTAL, r * CELL_TOTAL + ROWS * CELL_TOTAL, 'y');
             }
         }
     }
@@ -818,8 +751,12 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
 
         if (dragAxis === null) {
             const threshold = 8;
-            if (Math.abs(deltaX) > threshold || Math.abs(deltaY) > threshold) {
-                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            const absDx = Math.abs(deltaX), absDy = Math.abs(deltaY);
+            if (absDx > threshold || absDy > threshold) {
+                const ratio = Math.min(absDx, absDy) / (Math.max(absDx, absDy) || 1);
+                if (ratio > 0.6) {
+                    dragAxis = 'diagonal';
+                } else if (absDx > absDy) {
                     dragAxis = 'horizontal';
                     saveState();
                     for (let c = 0; c < COLS; c++) {
@@ -828,6 +765,11 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
                     createGhosts('horizontal', dragRow);
                 } else {
                     dragAxis = 'vertical';
+                    saveState();
+                    for (let r = 0; r < ROWS; r++) {
+                        initialPositions.push({ idx: r * COLS + dragCol, baseY: r * CELL_TOTAL });
+                    }
+                    createGhosts('vertical', dragCol);
                 }
             }
         }
@@ -843,8 +785,18 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
                 ghost.el.style.transition = 'none';
                 ghost.el.style.left = (ghost.baseX + dragOffset) + 'px';
             }
-        } else {
+        } else if (dragAxis === 'vertical') {
             dragOffset = deltaY;
+            for (const item of initialPositions) {
+                const cellParent = dominoElements[item.idx]?.parentElement;
+                if (cellParent) { cellParent.style.transition = 'none'; cellParent.style.top = (item.baseY + dragOffset) + 'px'; }
+            }
+            for (const ghost of ghostElements) {
+                ghost.el.style.transition = 'none';
+                ghost.el.style.top = (ghost.baseY + dragOffset) + 'px';
+            }
+        } else {
+            dragOffset = Math.abs(deltaX) + Math.abs(deltaY);
         }
     }
 
@@ -870,7 +822,6 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
         if (dragAxis === 'horizontal') {
             const steps = Math.round(dragOffset / CELL_TOTAL);
 
-            // Animer vers position finale
             for (const item of initialPositions) {
                 const cellParent = dominoElements[item.idx]?.parentElement;
                 if (!cellParent) continue;
@@ -893,7 +844,6 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
                 cellParent.style.left = (newCol * CELL_TOTAL) + 'px';
             }
 
-            // Mettre à jour la grille logique
             const row = dragRow;
             const newCells = [], newLastMoved = [];
             for (let c = 0; c < COLS; c++) {
@@ -905,9 +855,43 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
             lastMovedIndices = newLastMoved;
 
         } else if (dragAxis === 'vertical') {
-            if (Math.abs(dragOffset) > 20) {
+            const steps = Math.round(dragOffset / CELL_TOTAL);
+
+            for (const item of initialPositions) {
+                const cellParent = dominoElements[item.idx]?.parentElement;
+                if (!cellParent) continue;
+                const origRow = Math.round(item.baseY / CELL_TOTAL);
+                const newRow = ((origRow + steps) % ROWS + ROWS) % ROWS;
+                const targetY = newRow * CELL_TOTAL;
+                let currentY = item.baseY + dragOffset;
+                while (currentY - targetY > ROWS * CELL_TOTAL / 2) currentY -= ROWS * CELL_TOTAL;
+                while (targetY - currentY > ROWS * CELL_TOTAL / 2) currentY += ROWS * CELL_TOTAL;
+                cellParent.style.transition = 'none';
+                cellParent.style.top = currentY + 'px';
+            }
+            grid.offsetHeight;
+            for (const item of initialPositions) {
+                const cellParent = dominoElements[item.idx]?.parentElement;
+                if (!cellParent) continue;
+                const origRow = Math.round(item.baseY / CELL_TOTAL);
+                const newRow = ((origRow + steps) % ROWS + ROWS) % ROWS;
+                cellParent.style.transition = 'top 0.15s ease-out';
+                cellParent.style.top = (newRow * CELL_TOTAL) + 'px';
+            }
+
+            const col = dragCol;
+            const newCells = [], newLastMoved = [];
+            for (let r = 0; r < ROWS; r++) {
+                const src = ((r - steps) % ROWS + ROWS) % ROWS;
+                newCells[r] = cells[src * COLS + col];
+                newLastMoved.push(r * COLS + col);
+            }
+            for (let r = 0; r < ROWS; r++) cells[r * COLS + col] = newCells[r];
+            lastMovedIndices = newLastMoved;
+
+        } else if (dragAxis === 'diagonal') {
+            if (distance > 20) {
                 flipCell(dragRow * COLS + dragCol);
-                // flipCell gère son propre render/timing
                 clearGhosts();
                 dragAxis = null;
                 initialPositions = [];
@@ -1058,22 +1042,16 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
         if (!skipGravity) applyGravity();
     }
 
-    // 2 dominos adjacents matchent si même orientation (vertical/horizontal)
+    // 2 faces adjacentes matchent ?
     function checkPairMatch(idx1, dir1, idx2, dir2) {
-        const c1 = cells[idx1], c2 = cells[idx2];
-        if (!c1 || !c2) return false;
-        const r1 = ((c1.rotation % 360) + 360) % 360;
-        const r2 = ((c2.rotation % 360) + 360) % 360;
-        const isVert1 = (r1 === 0 || r1 === 180);
-        const isVert2 = (r2 === 0 || r2 === 180);
-        if (isVert1 !== isVert2) return false;
-        // Vérifier que les demi-faces en contact ont le même état
         const hId1 = getExposedHalfId(idx1, dir1);
         const hId2 = getExposedHalfId(idx2, dir2);
         if (!hId1 || !hId2) return false;
+        const icon1 = getDisplayIcon(hId1, idx1);
+        const icon2 = getDisplayIcon(hId2, idx2);
         const state1 = getVisibleHalfState(hId1, idx1);
         const state2 = getVisibleHalfState(hId2, idx2);
-        return state1 === state2;
+        return icon1 && icon2 && icon1 === icon2 && state1 === state2;
     }
 
     // Twins
@@ -1481,6 +1459,13 @@ cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
     // UI TOGGLES
     // ============================================
     function toggleMenu() { document.getElementById('settings-layer').classList.toggle('active'); }
+    function toggleBottomMenu() {
+        const menu = document.getElementById('bottom-menu');
+        const btn = document.getElementById('bottom-toggle');
+        const isOpen = menu.classList.toggle('open');
+        btn.classList.toggle('open', isOpen);
+        btn.textContent = isOpen ? '╳' : '━';
+    }
     function toggleNotes() { document.getElementById('notes-panel').classList.toggle('active'); }
     function toggleNumbers() {
         showNumbers = !showNumbers;
