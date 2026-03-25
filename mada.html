@@ -2,1543 +2,1554 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ADAM - Puzzle Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADAM Cube — K5 v35 · Three.js</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root { --cell: min(110px, 32.5vw); --gap: 0px; --border-opacity: 1; }
-        html, body { height: 100%; overflow: hidden; touch-action: none; }
         body {
-            background-color: #12131a;
-            min-height: 100vh; min-height: -webkit-fill-available;
-            display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            padding: 4px;
+            background: #0c0d14; min-height: 100vh;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            font-family: 'Courier New', monospace;
+            overflow: hidden; user-select: none;
+            color: rgba(180,180,190,0.5);
         }
-
-        /* ═══ BOTTOM BAR ═══ */
-        .bottom-bar {
-            display: flex; flex-direction: column; align-items: center; gap: 0;
-            width: calc(var(--cell) * 3 + var(--gap) * 2 + 40px);
-            position: fixed; bottom: calc(4px + env(safe-area-inset-bottom, 12px)); left: 50%; transform: translateX(-50%);
-        }
-        .bottom-toggle {
-            width: 36px; height: 14px; display: flex; align-items: center; justify-content: center;
-            background: transparent; border: none; cursor: pointer; padding: 0;
-            color: rgba(180,180,190,0.25); font-size: 10px; transition: color 0.2s;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .bottom-toggle:hover { color: rgba(180,180,190,0.5); }
-        .bottom-toggle.open { color: rgba(180,180,190,0.4); }
-        .bottom-menu {
-            display: none; flex-direction: column; align-items: center; gap: 6px;
-            width: 100%; padding-bottom: 4px;
-        }
-        .bottom-menu.open { display: flex; }
-        .bottom-row {
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            width: 100%;
-        }
-        .action-btn {
-            flex: 1; padding: 10px 16px; background: transparent;
-            border: 1px solid rgba(180,180,190,0.35); color: rgba(180,180,190,0.7);
-            border-radius: 8px; cursor: pointer; font-size: 0.8rem; letter-spacing: 0.05em; transition: all 0.2s;
-        }
-        .action-btn:hover { border-color: rgba(180,180,190,0.6); color: rgba(220,220,230,0.9); }
-
-        .points-toggle {
-            width: 32px; height: 32px; border-radius: 6px; border: 1px solid rgba(34,211,238,0.4);
-            background: rgba(34,211,238,0.1); color: rgba(34,211,238,0.6);
-            font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s; padding: 0;
-        }
-        .points-toggle:hover { border-color: rgba(34,211,238,0.7); background: rgba(34,211,238,0.2); }
-        .points-toggle.active { border-color: #22d3ee; background: rgba(34,211,238,0.3); color: #22d3ee; box-shadow: 0 0 10px rgba(34,211,238,0.4); }
-
-        /* ═══ GAME CONTAINER ═══ */
-        .game-container {
-            position: relative;
-            width: calc(var(--cell) * 3 + var(--gap) * 2);
-            height: calc(var(--cell) * 3 + var(--gap) * 2);
-            overflow: hidden;
-            perspective: 1200px;
-        }
-        .flip-wrapper {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            transform-style: preserve-3d;
-        }
-        .flip-wrapper.flipping {
-            animation: flipFullAnim 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        @keyframes flipFullAnim {
-            0%   { transform: rotateY(0deg); }
-            50%  { transform: rotateY(90deg); }
-            100% { transform: rotateY(0deg); }
-        }
-        .grid {
-            position: absolute; top: 0; left: 0;
-            width: calc(var(--cell) * 3 + var(--gap) * 2);
-            height: calc(var(--cell) * 3 + var(--gap) * 2);
-        }
-
-        /* ═══ SETTINGS LAYER ═══ */
-        .settings-layer {
-            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); border: 2px solid rgba(34,211,238,0.5);
-            border-radius: 12px; z-index: 100;
-        }
-        .settings-layer.active { display: block; }
-
-
-        /* ═══ DOMINO CONTAINER ═══ */
-        .cell {
-            width: var(--cell); height: var(--cell);
-            position: absolute;
-        }
-        .domino {
-            width: 100%; height: 100%; position: absolute; top: 0; left: 0;
-            border-radius: 12px; overflow: hidden;
-            cursor: grab; user-select: none; touch-action: none;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .domino:active { cursor: grabbing; }
-        .domino.empty { cursor: default; }
-        .domino.empty .face { border-color: rgba(180,180,190,0.2); border-style: dashed; }
-        .domino.ghost { pointer-events: none; opacity: 0.9; }
-
-        /* ═══ FACE (demi-domino) ═══ */
-        .face {
-            position: absolute; left: 0; width: 100%; height: 50%;
-            background-color: #12131a;
-            border: 1px solid rgba(180,180,190,0.35);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .face.top { top: 0; border-radius: 12px 12px 0 0; border-bottom: 1px solid rgba(180,180,190,0.12); }
-        .face.bottom { bottom: 0; border-radius: 0 0 12px 12px; border-top: none; }
-        .face svg { width: 90%; height: 90%; }
-        .face svg.back-layer { position: absolute; width: 90%; height: 90%; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-        .face svg.back-layer .icon { stroke: rgba(255,255,255,0.5) !important; filter: none !important; }
-        .face svg.back-layer .point { fill: rgba(255,255,255,0.5) !important; filter: none !important; }
-        .show-back-layer .face svg.back-layer { opacity: 0.75; }
-
-        svg line.icon, svg path.icon, svg circle.icon, svg rect.icon {
-            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none;
-        }
-        svg circle.point { stroke: none; }
-
-        /* ═══ ÉTATS ═══ */
-        /* WHITE — PILE (visible) */
-        .domino.white .face { border-color: rgba(180,180,190,0.40); }
-        .domino.white .face.top { border-bottom-color: rgba(180,180,190,0.25); }
-        .domino.white svg .icon { stroke: rgba(180,180,190,0.35); }
-        .domino.white svg .point { fill: rgba(180,180,190,0.35); }
-        /* WHITE — FACE (atténué) */
-        .domino.white.cell-flipped .face { border-color: rgba(180,180,190,0.18); }
-        .domino.white.cell-flipped .face.top { border-bottom-color: rgba(180,180,190,0.10); }
-        .domino.white.cell-flipped svg .icon { stroke: rgba(180,180,190,0.15); }
-        .domino.white.cell-flipped svg .point { fill: rgba(180,180,190,0.15); }
-
-        /* SILVER */
-        .domino.silver .face { border-color: rgba(6,182,212,0.6); }
-        .domino.silver .face.top { border-bottom-color: rgba(34,211,238,0.3); }
-        .domino.silver svg .icon { stroke: #22d3ee; filter: drop-shadow(0 0 3px rgba(34,211,238,0.5)); }
-        .domino.silver svg .point { fill: #22d3ee; filter: drop-shadow(0 0 3px rgba(34,211,238,0.5)); }
-        .domino.silver.cell-flipped .face { border-color: rgba(6,182,212,0.35); }
-        .domino.silver.cell-flipped svg .icon { stroke: rgba(34,211,238,0.5); filter: none; }
-        .domino.silver.cell-flipped svg .point { fill: rgba(34,211,238,0.5); filter: none; }
-
-        /* GOLD */
-        .domino.gold .face { border-color: rgba(255,215,0,0.7); }
-        .domino.gold .face.top { border-bottom-color: rgba(255,215,0,0.35); }
-        .domino.gold svg .icon { stroke: #ffd700; filter: drop-shadow(0 0 5px rgba(255,215,0,0.7)); }
-        .domino.gold svg .point { fill: #ffd700; filter: drop-shadow(0 0 5px rgba(255,215,0,0.7)); }
-        .domino.gold.cell-flipped .face { border-color: rgba(255,215,0,0.4); }
-        .domino.gold.cell-flipped svg .icon { stroke: rgba(255,215,0,0.5); filter: none; }
-        .domino.gold.cell-flipped svg .point { fill: rgba(255,215,0,0.5); filter: none; }
-
-        /* EMERALD */
-        .domino.emerald .face { border-color: rgba(52,211,153,0.9); }
-        .domino.emerald .face.top { border-bottom-color: rgba(52,211,153,0.5); }
-        .domino.emerald svg .icon { stroke: #34d399; filter: drop-shadow(0 0 6px rgba(52,211,153,0.9)) drop-shadow(0 0 12px rgba(5,150,105,0.5)); animation: emeraldIconPulse 2.5s ease-in-out infinite; }
-        .domino.emerald svg .point { fill: #34d399; filter: drop-shadow(0 0 6px rgba(52,211,153,0.9)); animation: emeraldIconPulse 2.5s ease-in-out infinite; }
-        .domino.emerald.cell-flipped .face { border-color: rgba(52,211,153,0.5); }
-        .domino.emerald.cell-flipped svg .icon { stroke: rgba(52,211,153,0.5); filter: none; animation: none; }
-        .domino.emerald.cell-flipped svg .point { fill: rgba(52,211,153,0.5); filter: none; animation: none; }
-        @keyframes emeraldIconPulse {
-            0%, 100% { filter: drop-shadow(0 0 6px rgba(52,211,153,0.9)) drop-shadow(0 0 12px rgba(5,150,105,0.5)); }
-            50% { filter: drop-shadow(0 0 10px rgba(52,211,153,1)) drop-shadow(0 0 18px rgba(5,150,105,0.7)); }
-        }
-
-        /* COSMIC */
-        .domino.cosmic .face { border: 2px solid rgba(131,56,236,0.6); }
-        .domino.cosmic .face.top { border-bottom-color: rgba(196,181,253,0.4); }
-        .domino.cosmic svg .icon { stroke: #c4b5fd; filter: drop-shadow(0 0 6px rgba(131,56,236,0.7)) drop-shadow(0 0 12px rgba(255,0,110,0.4)); animation: cosmicIconShift 3s ease-in-out infinite; }
-        .domino.cosmic svg .point { fill: #c4b5fd; filter: drop-shadow(0 0 6px rgba(131,56,236,0.7)); animation: cosmicPointPulse 1.5s ease-in-out infinite; }
-        .domino.cosmic.cell-flipped .face { border-color: rgba(131,56,236,0.35); }
-        .domino.cosmic.cell-flipped svg .icon { stroke: rgba(196,181,253,0.5); filter: none; animation: none; }
-        .domino.cosmic.cell-flipped svg .point { fill: rgba(196,181,253,0.5); filter: none; animation: none; }
-        @keyframes cosmicIconShift { 0%, 100% { stroke: #c4b5fd; } 33% { stroke: #22d3ee; } 66% { stroke: #f472b6; } }
-        @keyframes cosmicPointPulse { 0%, 100% { fill: #c4b5fd; } 50% { fill: #f472b6; } }
-
-        /* SUPERNOVAE */
-        .domino.supernovae .face { border: 3px solid rgba(255,140,0,0.7); }
-        .domino.supernovae .face.top { border-bottom-color: rgba(255,235,59,0.5); }
-        .domino.supernovae svg .icon { stroke: #ffeb3b; filter: drop-shadow(0 0 8px rgba(255,215,0,0.8)) drop-shadow(0 0 14px rgba(255,140,0,0.5)); animation: supernovaIconShift 2.5s ease-in-out infinite; }
-        .domino.supernovae svg .point { fill: #ffeb3b; filter: drop-shadow(0 0 8px rgba(255,215,0,0.8)); animation: supernovaPointPulse 1.2s ease-in-out infinite; }
-        .domino.supernovae.cell-flipped .face { border-color: rgba(255,140,0,0.4); }
-        .domino.supernovae.cell-flipped svg .icon { stroke: rgba(255,235,59,0.5); filter: none; animation: none; }
-        .domino.supernovae.cell-flipped svg .point { fill: rgba(255,235,59,0.5); filter: none; animation: none; }
-        @keyframes supernovaIconShift { 0%, 100% { stroke: #ffeb3b; } 25% { stroke: #ff8c00; } 50% { stroke: #ffd700; } 75% { stroke: #ff6347; } }
-        @keyframes supernovaPointPulse { 0%, 100% { fill: #ffeb3b; } 33% { fill: #ff8c00; } 66% { fill: #ffd700; } }
-
-        /* CELL FLIPPED indicator — même style que pile */
-
-        /* ═══ DUAL STATE — per-half-face coloring ═══ */
-        .face[data-half-state="white"] { border-color: rgba(180,180,190,0.40) !important; }
-        .face[data-half-state="white"] svg .icon { stroke: rgba(180,180,190,0.35) !important; filter: none !important; }
-        .face[data-half-state="white"] svg .point { fill: rgba(180,180,190,0.35) !important; filter: none !important; }
-        .face[data-half-state="silver"] { border-color: rgba(6,182,212,0.6) !important; }
-        .face[data-half-state="silver"] svg .icon { stroke: #22d3ee !important; filter: drop-shadow(0 0 3px rgba(34,211,238,0.5)) !important; }
-        .face[data-half-state="silver"] svg .point { fill: #22d3ee !important; filter: drop-shadow(0 0 3px rgba(34,211,238,0.5)) !important; }
-        .face[data-half-state="gold"] { border-color: rgba(255,215,0,0.7) !important; }
-        .face[data-half-state="gold"] svg .icon { stroke: #ffd700 !important; filter: drop-shadow(0 0 5px rgba(255,215,0,0.7)) !important; }
-        .face[data-half-state="gold"] svg .point { fill: #ffd700 !important; filter: drop-shadow(0 0 5px rgba(255,215,0,0.7)) !important; }
-        .face[data-half-state="emerald"] { border-color: rgba(52,211,153,0.9) !important; }
-        .face[data-half-state="emerald"] svg .icon { stroke: #34d399 !important; filter: drop-shadow(0 0 6px rgba(52,211,153,0.9)) !important; animation: emeraldIconPulse 2.5s ease-in-out infinite; }
-        .face[data-half-state="emerald"] svg .point { fill: #34d399 !important; filter: drop-shadow(0 0 6px rgba(52,211,153,0.9)) !important; animation: emeraldIconPulse 2.5s ease-in-out infinite; }
-        .face[data-half-state="cosmic"] { border-color: rgba(131,56,236,0.6) !important; }
-        .face[data-half-state="cosmic"] svg .icon { stroke: #c4b5fd !important; filter: drop-shadow(0 0 6px rgba(131,56,236,0.7)) !important; animation: cosmicIconShift 3s ease-in-out infinite; }
-        .face[data-half-state="cosmic"] svg .point { fill: #c4b5fd !important; filter: drop-shadow(0 0 6px rgba(131,56,236,0.7)) !important; animation: cosmicPointPulse 1.5s ease-in-out infinite; }
-        .face[data-half-state="supernovae"] { border-color: rgba(255,140,0,0.7) !important; }
-        .face[data-half-state="supernovae"] svg .icon { stroke: #ffeb3b !important; filter: drop-shadow(0 0 8px rgba(255,215,0,0.8)) !important; animation: supernovaIconShift 2.5s ease-in-out infinite; }
-        .face[data-half-state="supernovae"] svg .point { fill: #ffeb3b !important; filter: drop-shadow(0 0 8px rgba(255,215,0,0.8)) !important; animation: supernovaPointPulse 1.2s ease-in-out infinite; }
-
-        /* FLIP ANIMATIONS — toujours rotateY horaire, sur le .cell parent */
-        .cell.flipping { animation: flipAnim 0.6s ease; }
-        @keyframes flipAnim {
-            0%   { transform: rotateY(0deg); }
-            50%  { transform: rotateY(90deg); }
-            100% { transform: rotateY(0deg); }
-        }
-
-        .domino.fusing { transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.4s ease; }
-
-        /* ═══ UI ═══ */
-        .level-btn {
-            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-            background: transparent; border: 1px solid rgba(180,180,190,0.35); color: rgba(180,180,190,0.6);
-            border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.2s;
-        }
-        .level-btn:hover { border-color: rgba(180,180,190,0.6); color: rgba(220,220,230,0.9); }
-        .level-btn.active { border-color: rgba(34,211,153,0.7); color: #34d399; box-shadow: 0 0 10px rgba(34,211,153,0.3); }
-
-        button {
-            background: transparent; border: 1px solid rgba(180,180,190,0.35); color: rgba(180,180,190,0.7);
-            padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 0.75rem; letter-spacing: 0.05em; transition: all 0.2s;
-        }
-        button:hover { border-color: rgba(180,180,190,0.6); color: rgba(220,220,230,0.9); }
-
-        .floating-points {
-            position: fixed; pointer-events: none; font-size: 1.2rem; font-weight: bold;
-            color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.8);
-            animation: floatUp 1s ease-out forwards; z-index: 1000;
-        }
-        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-60px) scale(1.3); } }
-
-        .notes-panel {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(18,19,26,0.95); backdrop-filter: blur(10px);
-            display: none; align-items: center; justify-content: center; z-index: 2000;
-        }
-        .notes-panel.active { display: flex; }
-        .notes-content {
-            background: rgba(255,255,255,0.05); border: 1px solid rgba(180,180,190,0.3);
-            border-radius: 16px; padding: 24px; max-width: 90%; max-height: 80vh; overflow-y: auto;
-            color: rgba(220,220,230,0.9);
-        }
-        .notes-content h2 { color: #22d3ee; margin-bottom: 16px; font-size: 1.2rem; }
-        .notes-content h3 { color: rgba(220,220,230,0.8); margin: 16px 0 8px 0; font-size: 1rem; }
-        .notes-content pre { background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; overflow-x: auto; font-family: monospace; font-size: 0.85rem; line-height: 1.6; }
-        .notes-content p { line-height: 1.6; margin: 8px 0; color: rgba(180,180,190,0.9); }
-        .close-notes { margin-top: 16px; width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(180,180,190,0.35); color: rgba(180,180,190,0.7); border-radius: 8px; cursor: pointer; }
-        .close-notes:hover { border-color: #22d3ee; color: #22d3ee; }
+        #c { width: 600px; height: 600px; touch-action: none; cursor: default; }
+        .hud { display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:12px; }
+        .face-label { color:rgba(126,200,227,0.25);font-size:0.7rem;letter-spacing:0.2em; }
+        .info-line { color:rgba(180,180,190,0.3);font-size:0.6rem;min-height:1.2em; }
+        .nav-dots { display:flex;gap:6px;margin-top:4px; }
+        .nav-dot { width:7px;height:7px;border-radius:50%;background:rgba(126,200,227,0.12);transition:all 0.4s; }
+        .nav-dot.active { background:rgba(126,200,227,0.6);box-shadow:0 0 7px rgba(126,200,227,0.4); }
+        .ctrl-row { display:flex;gap:8px;justify-content:center;margin-top:6px; }
+        .dbtn { background:transparent;border:1px solid rgba(126,200,227,0.25);color:rgba(126,200,227,0.4);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.6rem;font-family:inherit; }
+        .dbtn:hover { border-color:rgba(126,200,227,0.5);color:rgba(126,200,227,0.7); }
+        .slider-row { display:flex;align-items:center;gap:6px;margin-top:6px;color:rgba(126,200,227,0.4);font-size:0.55rem; }
+        .slider-row input[type=range] { -webkit-appearance:none;appearance:none;width:100px;height:3px;background:rgba(126,200,227,0.15);border-radius:2px;outline:none;cursor:pointer; }
+        .slider-row input[type=range]::-webkit-slider-thumb { -webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:rgba(126,200,227,0.5);border:1px solid rgba(126,200,227,0.3); }
+        .slider-row input[type=range]::-moz-range-thumb { width:10px;height:10px;border-radius:50%;background:rgba(126,200,227,0.5);border:1px solid rgba(126,200,227,0.3); }
     </style>
 </head>
 <body>
-
-    <div class="game-container" id="game-container">
-        <div class="settings-layer" id="settings-layer">
-            <div style="display: flex; flex-direction: column; gap: 12px; padding: 12px; align-items: center;">
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <button id="points-anim-toggle" class="points-toggle" title="Animation des points">✨</button>
-                    <button id="twin-toggle" class="points-toggle" title="Fusions Jumeaux">👯</button>
-                    <div style="display:flex;gap:4px;align-items:center;"><span style="color:#22d3ee;">💎</span><span id="silver-count" style="color:rgba(180,180,190,0.7);font-size:0.75rem;">0</span></div>
-                    <div style="display:flex;gap:4px;align-items:center;"><span style="color:#ffd700;">🏆</span><span id="gold-count" style="color:rgba(180,180,190,0.7);font-size:0.75rem;">0</span></div>
-                    <div style="display:flex;gap:4px;align-items:center;"><span style="color:#34d399;">💚</span><span id="emerald-count" style="color:rgba(180,180,190,0.7);font-size:0.75rem;">0</span></div>
-                    <div style="display:flex;gap:4px;align-items:center;"><span style="color:#c4b5fd;">🌟</span><span id="cosmic-count" style="color:rgba(180,180,190,0.7);font-size:0.75rem;">0</span></div>
-                    <div style="display:flex;gap:4px;align-items:center;"><span style="color:#ff8c00;">☀️</span><span id="supernovae-count" style="color:rgba(180,180,190,0.7);font-size:0.75rem;">0</span></div>
-                </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <button class="level-btn active" onclick="setLevel(1)">1</button>
-                    <button class="level-btn" onclick="setLevel(2)">2</button>
-                    <button class="level-btn" onclick="setLevel(3)">3</button>
-                    <button class="level-btn" onclick="setLevel(4)">4</button>
-                    <button class="level-btn" onclick="setLevel(5)">5</button>
-                    <button onclick="undo()">Undo</button>
-                    <button onclick="toggleNotes()">Note</button>
-                </div>
-            </div>
+    <canvas id="c" width="1200" height="1200"></canvas>
+    <div class="hud">
+        <div class="face-label" id="faceLabel">1 / 3</div>
+        <div class="nav-dots" id="navDots"></div>
+        <div class="info-line" id="infoLine"></div>
+        <div class="ctrl-row">
+            <button class="dbtn" id="btnReset">reset</button>
+            <button class="dbtn" id="btnExport">export JSON</button>
         </div>
-        <div class="flip-wrapper" id="flip-wrapper">
-            <div class="grid" id="grid"></div>
+        <div class="ctrl-row">
+            <button class="dbtn" id="btnCenter">axe ∣</button>
+            <button class="dbtn" id="btnBg">fond: étoiles ✦</button>
+        </div>
+        <div class="slider-row">
+            <span>◇</span>
+            <input type="range" id="sliderAlpha" min="10" max="100" value="100">
+            <span id="alphaVal">100%</span>
         </div>
     </div>
+    <div id="centerLine" style="display:none;position:fixed;top:0;left:50%;width:1px;height:100vh;background:rgba(255,0,0,0.4);pointer-events:none;z-index:999;"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
 
-    <div class="bottom-bar">
-        <div class="bottom-menu" id="bottom-menu">
-            <div class="bottom-row">
-                <button class="action-btn" onclick="toggleMenu()">Menu</button>
-                <button class="action-btn" onclick="undo()">Undo</button>
-                <button class="action-btn" onclick="flipAll()">Flip</button>
-                <button class="action-btn" onclick="toggleNumbers()" id="nb-btn">nb</button>
-            </div>
-            <div class="bottom-row">
-                <button class="action-btn" onclick="toggleBackLayer()" id="bl-btn">👁</button>
-                <button class="action-btn" onclick="toggleRespawn()" id="respawn-btn">♻️</button>
-                <button class="action-btn" onclick="toggleDualState()" id="dual-btn">🎭</button>
-                <button class="action-btn" onclick="toggleInheritRespawn()" id="inherit-btn">🧬</button>
-            </div>
-            <div class="bottom-row" style="gap:6px;align-items:center;">
-                <span style="color:rgba(180,180,190,0.5);font-size:0.65rem;white-space:nowrap;">Bords</span>
-                <input type="range" id="border-slider" min="0" max="100" value="100" style="flex:1;height:20px;accent-color:#22d3ee;cursor:pointer;" oninput="setBorderOpacity(this.value)">
-                <span id="border-val" style="color:rgba(180,180,190,0.5);font-size:0.65rem;min-width:28px;text-align:right;">100%</span>
-            </div>
-        </div>
-        <button class="bottom-toggle" id="bottom-toggle" onclick="toggleBottomMenu()">━</button>
-    </div>
+// ═══ ICÔNES — dessin Canvas2D direct ═══
+// Chaque fonction dessine dans un ctx, centré sur (cx,cy), taille ~sz
+// Couleur néon cyan
 
-    <div class="notes-panel" id="notes-panel">
-        <div class="notes-content">
-            <h2>📝 ADAM v31 — Dual State + Inherit Respawn</h2>
-            <h3>Architecture :</h3>
-            <p>Chaque demi-face est une entité indépendante (id, pileIcon, faceIcon, state).</p>
-            <p>Chaque cellule est un conteneur (topHalfId, bottomHalfId, rotation, flipped).</p>
-            <pre>
-halfFaces[id] = { id, pileIcon, faceIcon, state }
-cells[0..8]   = { topHalfId, bottomHalfId, rotation, flipped } | null
-            </pre>
-            <h3>Contrôles :</h3>
-            <p><strong>Tap moitié droite :</strong> rotation +90° (horaire)</p>
-            <p><strong>Tap moitié gauche :</strong> rotation -90° (antihoraire)</p>
-            <p><strong>Drag horizontal :</strong> tapis roulant (déplace la ligne)</p>
-            <p><strong>Swipe vertical :</strong> retourne le domino (pile/face)</p>
-            <button class="close-notes" onclick="toggleNotes()">Fermer</button>
-        </div>
-    </div>
+function drawIcon(ctx, iconIdx, cx, cy, sz, color) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = sz * 0.08;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = color;
+    ctx.shadowBlur = sz * 0.25;
+    const h = sz * 0.4, w = sz * 0.4;
 
-    <script>
-    /* ═══════════════════════════════════════════════════════════════
-     * ADAM v25 — MOTEUR À 18 DEMI-FACES INDÉPENDANTES
-     * ═══════════════════════════════════════════════════════════════ */
+    switch(iconIdx) {
+        case 0: // chevronUp
+            ctx.beginPath();
+            ctx.moveTo(cx-w, cy+h*0.5); ctx.lineTo(cx, cy-h*0.5); ctx.lineTo(cx+w, cy+h*0.5);
+            ctx.stroke(); break;
+        case 1: // chevronDown
+            ctx.beginPath();
+            ctx.moveTo(cx-w, cy-h*0.5); ctx.lineTo(cx, cy+h*0.5); ctx.lineTo(cx+w, cy-h*0.5);
+            ctx.stroke(); break;
+        case 2: // circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, sz*0.28, 0, Math.PI*2);
+            ctx.stroke(); break;
+        case 3: // twoCircles
+            ctx.beginPath(); ctx.arc(cx-w*0.45, cy, sz*0.18, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(cx+w*0.45, cy, sz*0.18, 0, Math.PI*2); ctx.stroke();
+            break;
+        case 4: // line
+            ctx.beginPath(); ctx.moveTo(cx-w, cy); ctx.lineTo(cx+w, cy);
+            ctx.stroke(); break;
+        case 5: // threeLines
+            ctx.beginPath(); ctx.moveTo(cx-w*0.5, cy-h); ctx.lineTo(cx-w*0.5, cy+h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy-h); ctx.lineTo(cx, cy+h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx+w*0.5, cy-h); ctx.lineTo(cx+w*0.5, cy+h); ctx.stroke();
+            break;
+        case 6: // twoPoints
+            ctx.beginPath(); ctx.arc(cx-w*0.45, cy, sz*0.09, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx+w*0.45, cy, sz*0.09, 0, Math.PI*2); ctx.fill();
+            break;
+        case 7: // threePoints
+            ctx.beginPath(); ctx.arc(cx, cy-h*0.5, sz*0.09, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx-w*0.55, cy+h*0.45, sz*0.09, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx+w*0.55, cy+h*0.45, sz*0.09, 0, Math.PI*2); ctx.fill();
+            break;
+        case 8: // waveUp
+            ctx.beginPath();
+            ctx.moveTo(cx-w, cy+h*0.3);
+            ctx.quadraticCurveTo(cx-w*0.3, cy-h, cx, cy);
+            ctx.quadraticCurveTo(cx+w*0.3, cy+h, cx+w, cy-h*0.3);
+            ctx.stroke(); break;
+        case 9: // waveDown
+            ctx.beginPath();
+            ctx.moveTo(cx-w, cy-h*0.3);
+            ctx.quadraticCurveTo(cx-w*0.3, cy+h, cx, cy);
+            ctx.quadraticCurveTo(cx+w*0.3, cy-h, cx+w, cy+h*0.3);
+            ctx.stroke(); break;
+        case 10: // twoL
+            ctx.beginPath(); ctx.moveTo(cx-w*0.6, cy-h*0.7); ctx.lineTo(cx-w*0.6, cy+h*0.4); ctx.lineTo(cx+w*0.1, cy+h*0.4); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx+w*0.6, cy-h*0.7); ctx.lineTo(cx+w*0.6, cy+h*0.4); ctx.lineTo(cx-w*0.1, cy+h*0.4); ctx.stroke();
+            break;
+        case 11: // arc
+            ctx.beginPath();
+            ctx.moveTo(cx-w*0.8, cy+h*0.3);
+            ctx.quadraticCurveTo(cx, cy-h*0.9, cx+w*0.8, cy+h*0.3);
+            ctx.stroke(); break;
+        case 12: // twoSquares
+            ctx.strokeRect(cx-w*0.7, cy-h*0.35, sz*0.22, sz*0.22);
+            ctx.strokeRect(cx+w*0.15, cy-h*0.35, sz*0.22, sz*0.22);
+            break;
+        case 13: // target
+            ctx.beginPath(); ctx.arc(cx, cy, sz*0.28, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(cx, cy, sz*0.1, 0, Math.PI*2); ctx.fill();
+            break;
+        case 14: // dumbbell
+            ctx.beginPath(); ctx.arc(cx-w*0.55, cy, sz*0.12, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(cx+w*0.55, cy, sz*0.12, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx-w*0.43, cy); ctx.lineTo(cx+w*0.43, cy); ctx.stroke();
+            break;
+        case 15: // singleLine (vertical)
+            ctx.beginPath(); ctx.moveTo(cx, cy-h*0.8); ctx.lineTo(cx, cy+h*0.8);
+            ctx.stroke(); break;
+        case 16: // singlePoint
+            ctx.beginPath(); ctx.arc(cx, cy, sz*0.12, 0, Math.PI*2); ctx.fill();
+            break;
+        case 17: // diamond
+            ctx.beginPath();
+            ctx.moveTo(cx, cy-h*0.7); ctx.lineTo(cx+w*0.5, cy); ctx.lineTo(cx, cy+h*0.7); ctx.lineTo(cx-w*0.5, cy);
+            ctx.closePath(); ctx.stroke(); break;
+    }
+    ctx.restore();
+}
 
-    // ============================================
-    // CONSTANTES
-    // ============================================
-    const COLS = 3, ROWS = 3, TOTAL = 9;
-    const STATE_ORDER = ['white', 'silver', 'gold', 'emerald', 'cosmic', 'supernovae'];
-    const STATE_MULTIPLIER = { white: 1, silver: 2, gold: 3, emerald: 5, cosmic: 10, supernovae: 20 };
-    const POINTS = { simple: 100, chain: 500, twin: 1000 };
-    const FUSION_MOVE = 400, FUSION_APPEAR = 500, GRAVITY_DELAY = 150;
-    const MAX_HISTORY = 20;
-    const LEVEL_SEEDS = { 1: 55555, 2: 67890, 3: 77777, 4: 99991, 5: 12345 };
+// ═══ DOMINO TEXTURE — médiane verticale, néon, tout Canvas2D ═══
 
-    // Rotation → direction → which half ('top' ou 'bottom' dans le référentiel du domino)
-    const ROT_MAP = {
-        0:   { top: 'top', bottom: 'bottom' },
-        90:  { right: 'top', left: 'bottom' },
-        180: { bottom: 'top', top: 'bottom' },
-        270: { left: 'top', right: 'bottom' }
+const _dtc = {};
+const _bgc = {};
+
+function getDominoBgTex(tint){
+    if(_bgc[tint]) return _bgc[tint];
+    const S=512, cv=document.createElement('canvas'); cv.width=S; cv.height=S;
+    const ctx=cv.getContext('2d');
+    const C={
+        normal:{glow:'rgba(126,200,227,0.12)'},ice:{glow:'rgba(220,235,248,0.1)'},
+        cyan:{glow:'rgba(94,239,255,0.3)'},pink:{glow:'rgba(255,120,180,0.15)'},
+        silver:{glow:'rgba(34,211,238,0.15)'},gold:{glow:'rgba(255,215,0,0.15)'},
+        emerald:{glow:'rgba(52,211,153,0.15)'},
+        cosmic:{glow:'rgba(131,56,236,0.2)'},
+        supernovae:{glow:'rgba(255,140,0,0.2)'},
     };
+    const glow=(C[tint]||C.normal).glow;
+    const r=36, m=8;
+    ctx.fillStyle='rgba(14,15,24,0.92)';
+    ctx.beginPath();
+    ctx.moveTo(m+r,m);ctx.lineTo(S-m-r,m);ctx.quadraticCurveTo(S-m,m,S-m,m+r);
+    ctx.lineTo(S-m,S-m-r);ctx.quadraticCurveTo(S-m,S-m,S-m-r,S-m);
+    ctx.lineTo(m+r,S-m);ctx.quadraticCurveTo(m,S-m,m,S-m-r);
+    ctx.lineTo(m,m+r);ctx.quadraticCurveTo(m,m,m+r,m);
+    ctx.closePath();ctx.fill();
+    ctx.shadowColor=glow;ctx.shadowBlur=30;ctx.fill();ctx.shadowBlur=0;
+    const tex=new THREE.CanvasTexture(cv);
+    _bgc[tint]=tex; return tex;
+}
 
-    // ============================================
-    // ÉTAT GLOBAL
-    // ============================================
-    let halfFaces = {};     // Pool { id: { id, pileIcon, faceIcon, state } }
-    let cells = [];         // Grille [{ topHalfId, bottomHalfId, rotation, flipped } | null]
-    let halfIdCounter = 0;
-    let isGridFlipped = false;
-    let isAnimating = false;
-    let showNumbers = false;
-    let showPointsAnimation = true;
-    let showBackLayer = false;
-    let enableTwinFusion = false;
-    let enableRespawn = true;
-    let dualStateMode = false;
-    let inheritRespawn = false;
-    let score = 0, bestScore = 0, comboCount = 0, lastFusionTime = 0;
-    let currentLevel = 1;
-    let fusionCounts = { silver: 0, gold: 0, emerald: 0, cosmic: 0, supernovae: 0 };
-    let dominoSequenceIndex = 1;
-    let lastMovedIndices = [];
-    let history = [], scoreHistory = [];
+function getDominoTex(leftIdx, rightIdx, tint) {
+    const k = leftIdx+'|'+rightIdx+'|'+tint;
+    if (_dtc[k]) return _dtc[k];
 
-    // DOM
-    const grid = document.getElementById('grid');
-    let dominoElements = [];
-    let ghostElements = [];
+    const S = 512;
+    const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+    const ctx = cv.getContext('2d');
 
-    // Drag state
-    let isDragging = false, dragAxis = null;
-    let dragRow = -1, dragCol = -1;
-    let dragStartX = 0, dragStartY = 0, dragStartTime = 0, dragOffset = 0;
-    let clickedCellIdx = null, clickLocalX = 0;
-    let initialPositions = [];
-
-    // Dimensions
-    let CELL_SIZE = 0, GAP_SIZE = 0, CELL_TOTAL = 0;
-
-    // ============================================
-    // ICÔNES (identiques v24)
-    // ============================================
-    const ICONS = {
-        chevron:     { f1: 'M20 32L45 12L70 32', f2: 'M20 12L45 32L70 12', t: 'path' },
-        circle:      { f1: '45,22,12', f2: '45,22,12', t: 'circle' },
-        twoCircles:  { f1: '30,22,8|60,22,8', f2: '30,22,8|60,22,8', t: 'circles' },
-        line:        { f1: '15,22,75,22', f2: '15,22,75,22', t: 'line' },
-        threeLines:  { f1: '25,10,25,34|45,10,45,34|65,10,65,34', f2: '25,10,25,34|45,10,45,34|65,10,65,34', t: 'lines' },
-        twoPoints:   { f1: '30,22,4|60,22,4', f2: '30,22,4|60,22,4', t: 'points' },
-        square:      { f1: '18,6,54,32,3', f2: '18,6,54,32,3', t: 'rect' },
-        wave:        { f1: 'M10 22Q28 6 45 22Q62 38 80 22', f2: 'M10 22Q28 6 45 22Q62 38 80 22', t: 'path' },
-        twoL:        { f1: 'M15 10L15 22L27 22', f2: 'M75 10L75 22L63 22', t: 'path' },
-        arc:         { f1: 'M20 30Q45 8 70 30', f2: 'M20 14Q45 36 70 14', t: 'path' },
-        twoSquares:  { f1: '24,14,12,12,2|54,14,12,12,2', f2: '24,14,12,12,2|54,14,12,12,2', t: 'rects' },
-        target:      { f1: '45,22,12|45,22,4', f2: '45,22,12|45,22,4', t: 'target' },
-        dumbbell:    { f1: '30,22,5|60,22,5|30,22,60,22', f2: '30,22,5|60,22,5|30,22,60,22', t: 'dumbbell' },
-        singleLine:  { f1: '45,10,45,34', f2: '45,10,45,34', t: 'line' },
-        singlePoint: { f1: '45,22,5', f2: '45,22,5', t: 'circle' },
-        diamond:     { f1: 'M45 10L60 22L45 34L30 22Z', f2: 'M45 10L60 22L45 34L30 22Z', t: 'path' },
-        cross:       { f1: 'M45 8L45 36M29 22L61 22', f2: 'M45 8L45 36M29 22L61 22', t: 'path' },
-        triangle:    { f1: 'M45 10L65 34L25 34Z', f2: 'M45 34L65 10L25 10Z', t: 'path' },
-        zigzag:      { f1: 'M15 30L30 14L45 30L60 14L75 30', f2: 'M15 14L30 30L45 14L60 30L75 14', t: 'path' },
-        brackets:    { f1: 'M30 10L20 10L20 34L30 34', f2: 'M60 10L70 10L70 34L60 34', t: 'path' },
-        threePoints: { f1: '30,22,4|45,22,4|60,22,4', f2: '30,22,4|45,22,4|60,22,4', t: 'points' },
-        halfCircle:  { f1: 'M30 30A15 15 0 0 1 60 30', f2: 'M30 14A15 15 0 0 0 60 14', t: 'path' },
-        arrow:       { f1: 'M20 22L70 22M55 12L70 22L55 32', f2: 'M70 22L20 22M35 12L20 22L35 32', t: 'path' },
-        hexagon:     { f1: 'M35 10L55 10L65 22L55 34L35 34L25 22Z', f2: 'M35 10L55 10L65 22L55 34L35 34L25 22Z', t: 'path' },
-        miniDot:     { f1: '45,22,3', f2: '45,22,3', t: 'circle' },
-        twoDots:     { f1: '38,22,3|52,22,3', f2: '38,22,3|52,22,3', t: 'points' },
-        miniCross:   { f1: 'M45 16L45 28M39 22L51 22', f2: 'M45 16L45 28M39 22L51 22', t: 'path' },
-        miniSquare:  { f1: '38,15,14,14,2', f2: '38,15,14,14,2', t: 'rect' },
-        miniTriangle:{ f1: 'M45 14L54 30L36 30Z', f2: 'M45 30L54 14L36 14Z', t: 'path' },
-        slash:       { f1: 'M35 30L55 14', f2: 'M35 14L55 30', t: 'path' },
-        miniV:       { f1: 'M35 14L45 28L55 14', f2: 'M35 30L45 16L55 30', t: 'path' },
-        fourDots:    { f1: '38,16,2|52,16,2|38,28,2|52,28,2', f2: '38,16,2|52,16,2|38,28,2|52,28,2', t: 'points' },
-        oval:        { f1: 'M35 10Q25 10 25 22Q25 34 35 34L55 34Q65 34 65 22Q65 10 55 10Z', f2: 'M35 10Q25 10 25 22Q25 34 35 34L55 34Q65 34 65 22Q65 10 55 10Z', t: 'path' }
+    // Couleurs selon tint
+    const C={
+        normal:  {border:'rgba(126,200,227,0.5)',sep:'rgba(126,200,227,0.3)',icon:'#7ec8e3',glow:'rgba(126,200,227,0.12)'},
+        ice:     {border:'rgba(220,235,248,0.45)',sep:'rgba(220,235,248,0.25)',icon:'rgba(230,240,250,0.85)',glow:'rgba(220,235,248,0.1)'},
+        cyan:    {border:'rgba(126,200,227,0.9)',sep:'rgba(126,200,227,0.6)',icon:'#5eefff',glow:'rgba(94,239,255,0.3)'},
+        pink:    {border:'rgba(255,120,180,0.7)',sep:'rgba(255,120,180,0.4)',icon:'#ff78b4',glow:'rgba(255,120,180,0.15)'},
+        silver:  {border:'rgba(34,211,238,0.6)',sep:'rgba(34,211,238,0.35)',icon:'#22d3ee',glow:'rgba(34,211,238,0.15)'},
+        gold:    {border:'rgba(255,215,0,0.6)',sep:'rgba(255,215,0,0.35)',icon:'#ffd700',glow:'rgba(255,215,0,0.15)'},
+        emerald: {border:'rgba(52,211,153,0.6)',sep:'rgba(52,211,153,0.35)',icon:'#34d399',glow:'rgba(52,211,153,0.15)'},
+        cosmic:  {border:'rgba(131,56,236,0.7)',sep:'rgba(196,181,253,0.4)',icon:'#c4b5fd',glow:'rgba(131,56,236,0.2)'},
+        supernovae:{border:'rgba(255,140,0,0.7)',sep:'rgba(255,235,59,0.4)',icon:'#ffeb3b',glow:'rgba(255,140,0,0.2)'},
     };
+    const c=C[tint]||C.normal;
+    const border=c.border, sep=c.sep, iconC=c.icon, glow=c.glow;
 
-    const LEVEL_ICON_SETS = {
-        1: ['oval', 'twoCircles', 'twoPoints', 'square'],
-        2: ['twoL', 'arc', 'twoSquares', 'target', 'dumbbell', 'singleLine', 'singlePoint', 'diamond'],
-        3: ['cross', 'triangle', 'zigzag', 'brackets', 'threePoints', 'halfCircle', 'arrow', 'hexagon'],
-        4: ['chevron', 'circle', 'twoCircles', 'twoPoints', 'square'],
-        5: ['chevron', 'circle', 'twoCircles', 'line', 'threeLines', 'twoPoints', 'square', 'wave']
+    // Fond retiré — géré par bgMesh séparé
+    const r = 36, m = 8;
+
+    // Bordure néon
+    ctx.beginPath();
+    ctx.moveTo(m+r, m); ctx.lineTo(S-m-r, m); ctx.quadraticCurveTo(S-m, m, S-m, m+r);
+    ctx.lineTo(S-m, S-m-r); ctx.quadraticCurveTo(S-m, S-m, S-m-r, S-m);
+    ctx.lineTo(m+r, S-m); ctx.quadraticCurveTo(m, S-m, m, S-m-r);
+    ctx.lineTo(m, m+r); ctx.quadraticCurveTo(m, m, m+r, m);
+    ctx.closePath();
+    ctx.strokeStyle = border; ctx.lineWidth = 3;
+    ctx.shadowColor = border; ctx.shadowBlur = 15;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // ═══ SUPERPOSITION — deux icônes plein carré empilées ═══
+    const iconSz = S * 0.55;
+
+    // Couche arrière (face2 / rightIdx) — plus discrète
+    ctx.globalAlpha = 0.35;
+    drawIcon(ctx, rightIdx, S*0.5, S*0.5, iconSz, iconC);
+    ctx.globalAlpha = 1.0;
+
+    // Couche avant (face1 / leftIdx) — pleine intensité
+    drawIcon(ctx, leftIdx, S*0.5, S*0.5, iconSz, iconC);
+
+    // Médiane subtile par-dessus (séparateur visuel)
+    ctx.strokeStyle = sep; ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.4;
+    ctx.shadowColor = sep; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.moveTo(m+20, S/2); ctx.lineTo(S-m-20, S/2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1.0;
+
+    const tex = new THREE.CanvasTexture(cv);
+    _dtc[k] = tex;
+    return tex;
+}
+
+// ═══ SINGLE ICON TEXTURE — pour les demi-dominos prismatiques ═══
+
+const _sitc = {};
+function getSingleIconTex(iconIdx, tint) {
+    const k = iconIdx+'|'+tint;
+    if (_sitc[k]) return _sitc[k];
+
+    const S = 512;
+    const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+    const ctx = cv.getContext('2d');
+
+    const C={
+        prisme_cyan:    {border:'rgba(0,220,255,0.7)', icon:'#00dcff', glow:'rgba(0,220,255,0.2)'},
+        prisme_magenta: {border:'rgba(255,0,180,0.7)', icon:'#ff00b4', glow:'rgba(255,0,180,0.2)'},
     };
+    const c=C[tint]||C.prisme_cyan;
 
-    function getIconKeysForLevel(level) { return LEVEL_ICON_SETS[level] || LEVEL_ICON_SETS[1]; }
+    const r = 36, m = 8;
 
-    // ============================================
-    // UTILITAIRES
-    // ============================================
-    function seededRandom(seed) {
-        let state = seed;
-        return function() { state = (state * 1103515245 + 12345) & 0x7fffffff; return state / 0x7fffffff; };
+    // Bordure néon
+    ctx.beginPath();
+    ctx.moveTo(m+r, m); ctx.lineTo(S-m-r, m); ctx.quadraticCurveTo(S-m, m, S-m, m+r);
+    ctx.lineTo(S-m, S-m-r); ctx.quadraticCurveTo(S-m, S-m, S-m-r, S-m);
+    ctx.lineTo(m+r, S-m); ctx.quadraticCurveTo(m, S-m, m, S-m-r);
+    ctx.lineTo(m, m+r); ctx.quadraticCurveTo(m, m, m+r, m);
+    ctx.closePath();
+    ctx.strokeStyle = c.border; ctx.lineWidth = 2.5;
+    ctx.shadowColor = c.border; ctx.shadowBlur = 12;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Icône unique centrée
+    const iconSz = S * 0.55;
+    drawIcon(ctx, iconIdx, S*0.5, S*0.5, iconSz, c.icon);
+
+    const tex = new THREE.CanvasTexture(cv);
+    _sitc[k] = tex;
+    return tex;
+}
+
+// ═══ TABLEAUX ═══
+
+const GAP = 1.15;
+const TABLEAUX = [
+    { name:'T1', sats:[
+        {x:GAP, y:0, v:[11,13]}, {x:-GAP, y:0, v:[17,10], state:'cosmic'}
+    ] },
+    { name:'T2', sats:[
+        {x:0, y:-GAP, v:[14,12], state:'supernovae'}, {x:0, y:GAP, v:[16,11]}
+    ] },
+    { name:'T3', sats:[
+        {x:-GAP, y:-GAP, v:[13,15], state:'emerald'}, {x:GAP, y:-GAP, v:[10,17], state:'cosmic'},
+        {x:-GAP, y:GAP, v:[12,14]}, {x:GAP, y:GAP, v:[11,16], state:'silver'}
+    ] },
+    { name:'T4', sats:[
+        {x:GAP, y:-2*GAP, v:[0,11]}, {x:0, y:-2*GAP, v:[17,13], state:'supernovae'},
+        {x:GAP, y:-GAP, v:[15,10], state:'gold'}, {x:GAP, y:GAP, v:[12,8]},
+        {x:-GAP, y:-GAP, v:[14,2], state:'cosmic'}, {x:-GAP, y:GAP, v:[16,5]}
+    ] },
+];
+const TOTAL = TABLEAUX.length;
+
+// ═══ CONFIG ═══
+
+const HALF = 0.52;
+const CAM_Z = 18;
+
+const CAM_Z_MIN = 8;    // zoom max (caméra au plus près)
+const CAM_Z_MAX = 18;   // zoom min (caméra au plus loin)
+
+function camTargetFor(tIdx, viewIdx){
+    if(viewIdx===undefined) viewIdx=mod(currentIdx);
+    const pts=[{x:0, y:0}];
+    sats.forEach(s=>{
+        if(s.tableau===tIdx&&!s.locked) pts.push({x:s.lx, y:s.ly});
+    });
+    // Inclure la position physique du flottant
+    if(lockedSat && tIdx===viewIdx){
+        const wp=new THREE.Vector3();lockedSat.mesh.getWorldPosition(wp);
+        const lp=cubeGroup.worldToLocal(wp.clone());
+        pts.push({x:lp.x, y:lp.y});
     }
-    function getPos(i) { return { x: i % COLS, y: Math.floor(i / COLS) }; }
-    function getIndex(x, y) { return (x < 0 || x >= COLS || y < 0 || y >= ROWS) ? -1 : y * COLS + x; }
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    pts.forEach(p=>{
+        minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);
+        minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);
+    });
+    const cx=(minX+maxX)/2;
+    const hw=(maxX-minX)/2+0.6;
+    const hh=(maxY-minY)/2+0.6;
+    const spread=Math.max(hw,hh)*1.2;
+    const z=Math.min(CAM_Z_MAX, Math.max(CAM_Z_MIN, 1.5+spread*3.8));
+    return {x:cx, z};
+}
+function camTargetForStatic(tIdx){
+    const tab=TABLEAUX[tIdx]; if(!tab)return {x:0,z:CAM_Z};
+    // Inclure le cube central
+    const pts=[{x:0, y:0}];
+    tab.sats.forEach(s=>pts.push({x:s.x, y:s.y}));
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    pts.forEach(p=>{
+        minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);
+        minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);
+    });
+    const cx=(minX+maxX)/2;
+    const hw=(maxX-minX)/2+0.6;
+    const hh=(maxY-minY)/2+0.6;
+    const spread=Math.max(hw,hh)*1.2;
+    const z=Math.min(CAM_Z_MAX, Math.max(CAM_Z_MIN, 1.5+spread*3.8));
+    return {x:cx, z};
+}
 
-    function updateDimensions() {
-        CELL_SIZE = Math.min(110, window.innerWidth * 0.325);
-        GAP_SIZE = 0;
-        CELL_TOTAL = CELL_SIZE + GAP_SIZE;
+let targetCamX=0;
+function refreshZoom(){
+    const t=camTargetFor(mod(currentIdx));
+    targetCamX=t.x;targetCamZ=t.z;
+}
+
+const FACE_ROT=[0, Math.PI/2, Math.PI, -Math.PI/2];
+
+// ═══ THREE SETUP ═══
+
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setSize(600,600);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setClearColor(0x0c0d14);
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(40,1,0.1,100);
+const initCam=camTargetForStatic(0);
+camera.position.set(initCam.x,0,initCam.z);camera.lookAt(0,0,0);
+
+scene.add(new THREE.AmbientLight(0xffffff,0.8));
+
+// ═══ HELPERS ═══
+
+function rrShape(w,h,r){
+    const s=new THREE.Shape(),hw=w/2,hh=h/2;
+    s.moveTo(-hw+r,-hh);s.lineTo(hw-r,-hh);
+    s.quadraticCurveTo(hw,-hh,hw,-hh+r);s.lineTo(hw,hh-r);
+    s.quadraticCurveTo(hw,hh,hw-r,hh);s.lineTo(-hw+r,hh);
+    s.quadraticCurveTo(-hw,hh,-hw,hh-r);s.lineTo(-hw,-hh+r);
+    s.quadraticCurveTo(-hw,-hh,-hw+r,-hh);return s;
+}
+
+function placeSat(sat,faceRotY){
+    const q=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),faceRotY);
+    sat.mesh.position.copy(new THREE.Vector3(sat.lx,sat.ly,HALF+SAT_LIFT).applyQuaternion(q));
+    sat.mesh.quaternion.copy(q);
+    sat.baseQuat = q.clone(); // référence pour le breathing
+}
+
+// ═══ PORTE ═══
+
+let porteValue=[13,11];
+const cubeGroup=new THREE.Group();scene.add(cubeGroup);
+
+function makePorteTex(val){ return getDominoTex(val[0], val[1], 'ice'); }
+const cubeMats=[];for(let i=0;i<6;i++)cubeMats.push(new THREE.MeshBasicMaterial({map:makePorteTex(porteValue),transparent:true}));
+const cubeMesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),cubeMats);cubeMesh.userData.isCube=true;cubeGroup.add(cubeMesh);
+
+// Halo ice — sprite radial gradient face-caméra
+const haloCanvas=document.createElement('canvas');haloCanvas.width=256;haloCanvas.height=256;
+const hctx=haloCanvas.getContext('2d');
+const grad=hctx.createRadialGradient(128,128,0,128,128,128);
+grad.addColorStop(0,'rgba(220,235,248,0.25)');
+grad.addColorStop(0.3,'rgba(200,220,240,0.12)');
+grad.addColorStop(0.6,'rgba(180,210,235,0.04)');
+grad.addColorStop(1,'rgba(180,210,235,0)');
+hctx.fillStyle=grad;hctx.fillRect(0,0,256,256);
+const haloTex=new THREE.CanvasTexture(haloCanvas);
+const haloSpriteMat=new THREE.SpriteMaterial({map:haloTex,transparent:true,opacity:0.7,depthWrite:false});
+const haloSprite=new THREE.Sprite(haloSpriteMat);
+haloSprite.scale.set(2.8,2.8,1);
+cubeGroup.add(haloSprite);
+
+function updatePorte(val){porteValue=val;const tex=makePorteTex(val);cubeMats.forEach(m=>{m.map=tex;m.needsUpdate=true;});}
+
+// ═══ SATELLITES — un seul plane texturé, pas de double carré ═══
+
+const sats=[];
+const SAT_DEPTH = 0.06;  // épaisseur du domino
+const SAT_LIFT = 0.08;   // hauteur de flottement au-dessus de la face
+function createSatMesh(value,tint){
+    const grp=new THREE.Group(), SZ=1.0, R=0.12;
+
+    // ── Face avant (texture domino — sans fond, icônes+contours+médiane) ──
+    const nMesh=new THREE.Mesh(
+        new THREE.PlaneGeometry(SZ, SZ),
+        new THREE.MeshBasicMaterial({map:getDominoTex(value[0],value[1],tint||'normal'),transparent:true,side:THREE.DoubleSide})
+    );
+    nMesh.position.z = SAT_DEPTH/2 + 0.001;
+    grp.add(nMesh);
+
+    // ── Fond arrondi séparé (contrôlé par le variateur) ──
+    const bgMesh=new THREE.Mesh(
+        new THREE.PlaneGeometry(SZ, SZ),
+        new THREE.MeshBasicMaterial({map:getDominoBgTex(tint||'normal'),transparent:true,opacity:1.0,side:THREE.DoubleSide})
+    );
+    bgMesh.position.z = SAT_DEPTH/2 + 0.0005;
+    grp.add(bgMesh);
+
+    // ── Corps 3D (épaisseur) — arrondi, semi-transparent ──
+    const bodyShape = rrShape(SZ, SZ, R);
+    const extrudeSettings = {depth: SAT_DEPTH, bevelEnabled: false};
+    const bodyGeo = new THREE.ExtrudeGeometry(bodyShape, extrudeSettings);
+    bodyGeo.translate(0, 0, -SAT_DEPTH/2);
+    const sideMat = new THREE.MeshBasicMaterial({color:0x141520, transparent:true, opacity:0.45});sideMat._baseOp=0.45;
+    const faceMat = new THREE.MeshBasicMaterial({color:0x0a0b12, transparent:true, opacity:0.25});faceMat._baseOp=0.25;
+    const boxMesh = new THREE.Mesh(bodyGeo, [faceMat, sideMat]);
+    grp.add(boxMesh);
+
+    // ── Liseré néon sur les arêtes ──
+    const edgesGeo = new THREE.EdgesGeometry(bodyGeo, 15);
+    const edgeLines = new THREE.LineSegments(edgesGeo, new THREE.LineBasicMaterial({color:0x7ec8e3, transparent:true, opacity:0.18}));
+    grp.add(edgeLines);
+
+    // ── Ombre portée ──
+    const shadowCanvas = document.createElement('canvas'); shadowCanvas.width=128; shadowCanvas.height=128;
+    const sctx = shadowCanvas.getContext('2d');
+    const sg = sctx.createRadialGradient(64,64,10,64,64,60);
+    sg.addColorStop(0,'rgba(0,0,0,0.35)');
+    sg.addColorStop(0.5,'rgba(0,0,0,0.15)');
+    sg.addColorStop(1,'rgba(0,0,0,0)');
+    sctx.fillStyle=sg; sctx.fillRect(0,0,128,128);
+    const shadowTex = new THREE.CanvasTexture(shadowCanvas);
+    const shadowMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(SZ*1.25, SZ*1.25),
+        new THREE.MeshBasicMaterial({map:shadowTex, transparent:true, opacity:0.6, depthWrite:false})
+    );
+    shadowMesh.position.z = -SAT_DEPTH/2 - SAT_LIFT + 0.005;
+    grp.add(shadowMesh);
+
+    // ── Glow (derrière, pour état locked) ──
+    const gShape=rrShape(SZ+0.06,SZ+0.06,R+0.03);
+    const gMesh=new THREE.Mesh(new THREE.ShapeGeometry(gShape),new THREE.MeshBasicMaterial({color:0x7ec8e3,transparent:true,opacity:0}));
+    gMesh.position.z=-SAT_DEPTH/2-0.005;grp.add(gMesh);
+    // Halo
+    const hMesh=new THREE.Mesh(new THREE.ShapeGeometry(rrShape(SZ+0.2,SZ+0.2,R+0.08)),new THREE.MeshBasicMaterial({color:0x7ec8e3,transparent:true,opacity:0}));
+    hMesh.position.z=-SAT_DEPTH/2-0.01;grp.add(hMesh);
+
+    grp.userData={numMesh:nMesh,bgMesh:bgMesh,glowMesh:gMesh,haloMesh:hMesh,boxMesh:boxMesh,edgeLines:edgeLines,shadowMesh:shadowMesh,isSat:true};
+    return grp;
+}
+
+TABLEAUX.forEach((tab,tIdx)=>{tab.sats.forEach((sd,sIdx)=>{
+    const st=sd.state||'white';
+    const mesh=createSatMesh(sd.v,st!=='white'?st:undefined);mesh.visible=false;cubeGroup.add(mesh);
+    sats.push({id:tIdx*100+sIdx,value:sd.v,state:st,tableau:tIdx,origTableau:tIdx,lx:sd.x,ly:sd.y,origLx:sd.x,origLy:sd.y,locked:false,mesh});
+});});
+
+// ═══ STATE ═══
+
+let lockedSat=null,currentIdx=0,busy=false,isAnimating=false,navDir=0;
+let isFlipped=false, flipDir=0;
+let targetCamZ=camTargetForStatic(0).z;
+const targetQuat=new THREE.Quaternion();
+function mod(n){return((n%TOTAL)+TOTAL)%TOTAL;}
+
+// ═══ ASSIGN ═══
+
+function assignFaces(){
+    const faceMap=[[mod(currentIdx),0],[mod(currentIdx+1),1],[mod(currentIdx-1),3]];
+    sats.forEach(sat=>{
+        if(sat.locked)return;
+        const entry=faceMap.find(f=>f[0]===sat.tableau);
+        if(entry){placeSat(sat,FACE_ROT[entry[1]]);if(sat.mesh.parent!==cubeGroup)cubeGroup.attach(sat.mesh);}
+    });
+}
+
+// ═══ NAV ═══
+
+// Helper: masquer tout satellite aux mêmes coordonnées que la source du locked, tous tableaux confondus
+function isHiddenBySrc(s){
+    return lockedSat&&!s.locked&&Math.abs(s.lx-lockedSat.srcLx)<0.2&&Math.abs(s.ly-lockedSat.srcLy)<0.2;
+}
+
+function navRight(){
+    if(busy||isAnimating)return;busy=true;isAnimating=true;navDir=1;flipDir=0;
+    targetQuat.setFromAxisAngle(new THREE.Vector3(0,1,0),-Math.PI/2);
+    const nextIdx=mod(currentIdx+1);
+    const t=camTargetFor(nextIdx, nextIdx);targetCamX=t.x;targetCamZ=t.z;
+    const show=[mod(currentIdx),nextIdx];
+    sats.forEach(s=>{if(!s.locked&&show.includes(s.tableau))s.mesh.visible=!isHiddenBySrc(s);});
+}
+function navLeft(){
+    if(busy||isAnimating)return;busy=true;isAnimating=true;navDir=-1;flipDir=0;
+    targetQuat.setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI/2);
+    const nextIdx=mod(currentIdx-1);
+    const t=camTargetFor(nextIdx, nextIdx);targetCamX=t.x;targetCamZ=t.z;
+    const show=[mod(currentIdx),nextIdx];
+    sats.forEach(s=>{if(!s.locked&&show.includes(s.tableau))s.mesh.visible=!isHiddenBySrc(s);});
+}
+
+function flipUp(){
+    if(busy||isAnimating)return;busy=true;isAnimating=true;navDir=0;flipDir=1;
+    targetQuat.setFromAxisAngle(new THREE.Vector3(1,0,0), Math.PI);
+    isFlipped=!isFlipped;
+}
+function flipDown(){
+    if(busy||isAnimating)return;busy=true;isAnimating=true;navDir=0;flipDir=-1;
+    targetQuat.setFromAxisAngle(new THREE.Vector3(1,0,0), -Math.PI);
+    isFlipped=!isFlipped;
+}
+
+function onRotationComplete(){
+    if(flipDir!==0){
+        cubeGroup.quaternion.identity();targetQuat.identity();flipDir=0;
+        // Porte : re-swap pour annuler le swap mi-course (la porte résiste au flip)
+        updatePorte([porteValue[1],porteValue[0]]);
+        const fIdx=mod(currentIdx);
+        sats.forEach(s=>{
+            if(s.tableau===fIdx&&!s.locked&&s.tableau>=0){
+                s.ly=-s.ly;
+                s.mesh.scale.y *= -1;
+            }
+        });
+        assignFaces();isAnimating=false;busy=false;refreshZoom();updateUI();
+    } else {
+        currentIdx=mod(currentIdx+navDir);cubeGroup.quaternion.identity();targetQuat.identity();navDir=0;
+        assignFaces();isAnimating=false;busy=false;updateUI();
     }
+}
 
-    // ============================================
-    // MOTEUR DEMI-FACES — CORE
-    // ============================================
+// ═══ TAP ═══
 
-    // Retourne l'ID de la demi-face exposée dans une direction cardinale
-    function getExposedHalfId(cellIdx, direction) {
-        const cell = cells[cellIdx];
-        if (!cell) return null;
-        const r = ((cell.rotation % 360) + 360) % 360;
-        const which = ROT_MAP[r]?.[direction];
-        if (!which) return null;
-        return which === 'top' ? cell.topHalfId : cell.bottomHalfId;
+function tapLock(sat){
+    if(busy||isAnimating)return;if(lockedSat)tapRelease(lockedSat);
+    sat.locked=true;lockedSat=sat;sat.srcTableau=sat.tableau;sat.srcLx=sat.lx;sat.srcLy=sat.ly;
+    sat.savedScaleY=sat.mesh.scale.y; // préserver l'orientation flip
+    // Masquer tout satellite à la même position source (évite superposition pendant navigation)
+    sats.forEach(s=>{
+        if(s!==sat&&!s.locked&&s.tableau===sat.srcTableau&&Math.abs(s.lx-sat.srcLx)<0.2&&Math.abs(s.ly-sat.srcLy)<0.2)
+            s.mesh.visible=false;
+    });
+    scene.attach(sat.mesh);refreshZoom();updateUI();
+}
+function tapRelease(sat){
+    if(!sat.locked)return;
+    if(isAnimating||busy)return;
+    const wp=new THREE.Vector3();sat.mesh.getWorldPosition(wp);
+    cubeGroup.attach(sat.mesh);
+    const fIdx=mod(currentIdx);
+    const lp=cubeGroup.worldToLocal(wp.clone());
+    const lx=lp.x,ly=lp.y;
+    let closest=null,cd=Infinity;
+    for(const o of sats){if(o===sat||o.locked||o.tableau!==fIdx)continue;const d=Math.hypot(o.lx-lx,o.ly-ly);if(d<cd){cd=d;closest=o;}}
+    const savedSY=sat.savedScaleY||1;
+    if(closest&&cd<GAP*0.9){
+        const cT=closest.tableau,cX=closest.lx,cY=closest.ly;
+        const closestScaleY=closest.mesh.scale.y;
+        // Le satellite flottant prend la place du closest
+        sat.tableau=cT;sat.lx=cX;sat.ly=cY;placeSat(sat,FACE_ROT[0]);sat.mesh.scale.set(1,savedSY,1);
+        // Le closest prend la place source (peut être un autre tableau)
+        closest.tableau=sat.srcTableau;closest.lx=sat.srcLx;closest.ly=sat.srcLy;
+        closest.mesh.scale.set(1,closestScaleY,1);
+        closest.mesh.visible=true;
+    } else {
+        sat.tableau=fIdx;sat.lx=lx;sat.ly=ly;placeSat(sat,FACE_ROT[0]);sat.mesh.scale.set(1,savedSY,1);
     }
+    sat.locked=false;lockedSat=null;
+    assignFaces();
+    updateUI();
+}
 
-    // Retourne l'ID de l'AUTRE demi-face (celle qui n'est PAS exposée dans cette direction)
-    function getOtherHalfId(cellIdx, direction) {
-        const cell = cells[cellIdx];
-        if (!cell) return null;
-        const exposed = getExposedHalfId(cellIdx, direction);
-        if (exposed === null) return null;
-        return exposed === cell.topHalfId ? cell.bottomHalfId : cell.topHalfId;
+// ═══ DRAG SWAP ═══
+
+let swapAnim=null;
+
+function dragSwap(sat, dirX, dirY){
+    if(!sat||sat.locked||busy||isAnimating||swapAnim)return false;
+    const fIdx=mod(currentIdx);
+    if(sat.tableau!==fIdx)return false;
+    const st=sat.state||'white';
+    if(st==='white') return false;
+
+    // Direction constraints
+    if(st==='silver' && (dirY!==0||dirX===0)) return false;
+    if(st==='emerald' && (dirX!==0||dirY===0)) return false;
+    if(st==='gold' && (dirX===0||dirY===0)) return false;
+
+    const tx=sat.lx+dirX*GAP, ty=sat.ly+dirY*GAP;
+    const target=sats.find(s=>s!==sat&&!s.locked&&s.tableau===fIdx&&Math.abs(s.lx-tx)<0.2&&Math.abs(s.ly-ty)<0.2);
+    if(target){
+        const aFrom={x:sat.lx,y:sat.ly}, bFrom={x:target.lx,y:target.ly};
+        sat.lx=bFrom.x;sat.ly=bFrom.y;target.lx=aFrom.x;target.ly=aFrom.y;
+        swapAnim={pairs:[
+            {mesh:sat.mesh, from:aFrom, to:bFrom},
+            {mesh:target.mesh, from:bFrom, to:aFrom},
+        ], t:0};
+        return true;
     }
+    return false;
+}
 
-    // Icône affichée (pile ou face selon cell.flipped)
-    function getDisplayIcon(halfId, cellIdx) {
-        const hf = halfFaces[halfId];
-        if (!hf) return null;
-        const cell = cells[cellIdx];
-        if (!cell) return null;
-        return cell.flipped ? hf.faceIcon : hf.pileIcon;
-    }
+function dragPorte(dirX, dirY){
+    if(busy||isAnimating||swapAnim)return false;
+    const fIdx=mod(currentIdx);
+    const tx=dirX*GAP, ty=dirY*GAP;
+    const target=sats.find(s=>!s.locked&&s.tableau===fIdx&&Math.abs(s.lx-tx)<0.2&&Math.abs(s.ly-ty)<0.2);
+    if(!target)return false;
+    
+    // Créer un ghost de la porte (plane temporaire) qui va voyager vers la position du satellite
+    const ghostMesh=new THREE.Mesh(
+        new THREE.PlaneGeometry(1,1),
+        new THREE.MeshBasicMaterial({map:getDominoTex(porteValue[0],porteValue[1],'ice'),transparent:true})
+    );
+    ghostMesh.position.set(0,0,HALF+0.02);
+    cubeGroup.add(ghostMesh);
+    
+    // Masquer la face avant du cube pendant le swap
+    cubeMats[4].opacity=0;
+    haloSprite.visible=false;
+    
+    // Stocker les valeurs pour le swap final
+    swapAnim={
+        pairs:[{mesh:target.mesh, from:{x:target.lx,y:target.ly}, to:{x:0,y:0}}],
+        ghost:ghostMesh, ghostFrom:{x:0,y:0}, ghostTo:{x:target.lx,y:target.ly},
+        target:target, oldPorte:[...porteValue], oldSat:[...target.value],
+        t:0, isPorteSwap:true
+    };
+    return true;
+}
 
-    // Retourne l'état visible d'une demi-face (selon pile/face de la cellule)
-    function getVisibleHalfState(halfId, cellIdx) {
-        const hf = halfFaces[halfId];
-        if (!hf) return 'white';
-        const cell = cells[cellIdx];
-        if (!cell) return hf.pileState;
-        if (dualStateMode) {
-            return cell.flipped ? hf.faceState : hf.pileState;
+function tickSwapAnim(dt){
+    if(!swapAnim)return;
+    swapAnim.t+=dt*2.5; // plus lent pour bien voir
+    const p=Math.min(1, swapAnim.t);
+    const ease=p<0.5?2*p*p:(1-Math.pow(-2*p+2,2)/2);
+    
+    if(swapAnim.isPorteSwap){
+        // Satellite va vers le centre
+        swapAnim.pairs.forEach(pair=>{
+            pair.mesh.position.x=pair.from.x+(pair.to.x-pair.from.x)*ease;
+            pair.mesh.position.y=pair.from.y+(pair.to.y-pair.from.y)*ease;
+        });
+        // Ghost porte va vers la position du satellite
+        const g=swapAnim.ghost;
+        g.position.x=swapAnim.ghostFrom.x+(swapAnim.ghostTo.x-swapAnim.ghostFrom.x)*ease;
+        g.position.y=swapAnim.ghostFrom.y+(swapAnim.ghostTo.y-swapAnim.ghostFrom.y)*ease;
+        g.position.z=HALF+0.02;
+        
+        if(p>=1){
+            const target=swapAnim.target;
+            const flipped=target.mesh.scale.y<0;
+            // Porte reçoit les valeurs du sat — si le sat était flippé, ses valeurs visuelles sont inversées
+            if(flipped) updatePorte([swapAnim.oldSat[1],swapAnim.oldSat[0]]);
+            else updatePorte(swapAnim.oldSat);
+            // Sat reçoit les valeurs de la porte — si le sat est flippé, inverser pour compenser le scale.y
+            if(flipped) target.value=[swapAnim.oldPorte[1],swapAnim.oldPorte[0]];
+            else target.value=swapAnim.oldPorte;
+            const st=target.state||'white';
+            const tint=st!=='white'?st:'normal';
+            target.mesh.userData.numMesh.material.map=getDominoTex(target.value[0],target.value[1],tint);
+            // Nettoyer le ghost
+            cubeGroup.remove(swapAnim.ghost);
+            swapAnim.ghost.geometry.dispose();
+            swapAnim.ghost.material.dispose();
+            // Restaurer la face avant du cube
+            cubeMats[4].opacity=1;
+            haloSprite.visible=true;
+            // Replacer le satellite
+            placeSat(target,FACE_ROT[0]);
+            assignFaces();swapAnim=null;refreshZoom();updateUI();
         }
-        return hf.pileState; // mode normal, pileState = état unique
-    }
-
-    // État d'une cellule pour le CSS du conteneur (prend le plus élevé des 2 halves visibles)
-    function getCellState(cellIdx) {
-        const cell = cells[cellIdx];
-        if (!cell) return 'white';
-        const s1 = getVisibleHalfState(cell.topHalfId, cellIdx);
-        const s2 = getVisibleHalfState(cell.bottomHalfId, cellIdx);
-        if (s1 === s2) return s1;
-        return STATE_ORDER.indexOf(s1) >= STATE_ORDER.indexOf(s2) ? s1 : s2;
-    }
-
-    // Setter d'état : met à jour le bon côté selon le mode
-    // flipContext: soit un cellIdx (on lit cell.flipped), soit un objet {flipped: bool}
-    function setHalfState(halfId, newState, flipContext) {
-        const hf = halfFaces[halfId];
-        if (!hf) return;
-        if (dualStateMode) {
-            let isFlipped = false;
-            if (typeof flipContext === 'number') {
-                const cell = cells[flipContext];
-                isFlipped = cell ? cell.flipped : false;
-            } else if (flipContext && typeof flipContext === 'object') {
-                isFlipped = flipContext.flipped || false;
-            }
-            if (isFlipped) {
-                hf.faceState = newState;
-            } else {
-                hf.pileState = newState;
-            }
-        } else {
-            hf.pileState = newState;
-            hf.faceState = newState;
+    } else {
+        swapAnim.pairs.forEach(pair=>{
+            pair.mesh.position.x=pair.from.x+(pair.to.x-pair.from.x)*ease;
+            pair.mesh.position.y=pair.from.y+(pair.to.y-pair.from.y)*ease;
+        });
+        if(p>=1){
+            swapAnim.pairs.forEach(pair=>{
+                const sat=sats.find(s=>s.mesh===pair.mesh);
+                if(sat&&!sat.locked) placeSat(sat,FACE_ROT[0]);
+            });
+            assignFaces();swapAnim=null;refreshZoom();updateUI();
         }
     }
+}
 
-    // Reset état à white (les deux côtés)
-    function resetHalfState(halfId) {
-        const hf = halfFaces[halfId];
-        if (!hf) return;
-        hf.pileState = 'white';
-        hf.faceState = 'white';
-    }
+// ═══ RAYCAST ═══
 
-    // ============================================
-    // RENDU ICÔNE SVG
-    // ============================================
-    function renderIcon(iconKey, isFace2) {
-        const d = ICONS[iconKey];
-        if (!d) return '';
-        const data = isFace2 ? d.f2 : d.f1;
-        if (d.t === 'path') return `<path class="icon" d="${data}"/>`;
-        if (d.t === 'circle') { const [cx,cy,r] = data.split(','); return `<circle class="icon" cx="${cx}" cy="${cy}" r="${r}"/>`; }
-        if (d.t === 'line') { const [x1,y1,x2,y2] = data.split(','); return `<line class="icon" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`; }
-        if (d.t === 'rect') { const [x,y,w,h,rx] = data.split(','); return `<rect class="icon" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/>`; }
-        if (d.t === 'rects') return data.split('|').map(p => { const [x,y,w,h,rx] = p.split(','); return `<rect class="icon" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/>`; }).join('');
-        if (d.t === 'target') { const parts = data.split('|'); const [cx1,cy1,r1] = parts[0].split(','); const [cx2,cy2,r2] = parts[1].split(','); return `<circle class="icon" cx="${cx1}" cy="${cy1}" r="${r1}"/><circle class="point" cx="${cx2}" cy="${cy2}" r="${r2}"/>`; }
-        if (d.t === 'dumbbell') { const parts = data.split('|'); const [cx1,cy1,r1] = parts[0].split(','); const [cx2,cy2,r2] = parts[1].split(','); const [x1,y1,x2,y2] = parts[2].split(','); return `<circle class="point" cx="${cx1}" cy="${cy1}" r="${r1}"/><circle class="point" cx="${cx2}" cy="${cy2}" r="${r2}"/><line class="icon" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`; }
-        return data.split('|').map(p => { const v = p.split(','); return (d.t === 'circles' || d.t === 'points') ? `<circle class="${d.t === 'points' ? 'point' : 'icon'}" cx="${v[0]}" cy="${v[1]}" r="${v[2]}"/>` : `<line class="icon" x1="${v[0]}" y1="${v[1]}" x2="${v[2]}" y2="${v[3]}"/>`; }).join('');
-    }
+const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
+function getSatAt(cx,cy){
+    const r=canvas.getBoundingClientRect();mouse.x=((cx-r.left)/r.width)*2-1;mouse.y=-((cy-r.top)/r.height)*2+1;
+    raycaster.setFromCamera(mouse,camera);const all=[];
+    sats.forEach(s=>{if(s.mesh.visible)s.mesh.traverse(c=>{if(c.isMesh)all.push(c);});});
+    for(const h of raycaster.intersectObjects(all,false)){let o=h.object;while(o){if(o.userData&&o.userData.isSat){const s=sats.find(x=>x.mesh===o);if(s)return s;}o=o.parent;}}return null;
+}
 
-    // ============================================
-    // RENDU FACE HTML
-    // ============================================
-    function renderFaceHTML(halfId, cellIdx, position, isMirror) {
-        const hf = halfFaces[halfId];
-        if (!hf) return `<div class="face ${position} white empty"></div>`;
+function isCubeAt(cx,cy){
+    const r=canvas.getBoundingClientRect();mouse.x=((cx-r.left)/r.width)*2-1;mouse.y=-((cy-r.top)/r.height)*2+1;
+    raycaster.setFromCamera(mouse,camera);
+    const hits=raycaster.intersectObject(cubeMesh,false);
+    return hits.length>0;
+}
 
-        const cell = cells[cellIdx];
-        const showFaceIcon = isMirror ? !cell.flipped : cell.flipped;
-        const icon = showFaceIcon ? hf.faceIcon : hf.pileIcon;
-        const backIcon = showFaceIcon ? hf.pileIcon : hf.faceIcon;
-        const isF2 = (position === 'bottom');
+// ═══ POINTER ═══
 
-        // En dual state, l'état visible de cette demi-face spécifique
-        let halfState = null;
-        if (dualStateMode) {
-            if (isMirror) {
-                halfState = cell.flipped ? hf.pileState : hf.faceState;
-            } else {
-                halfState = cell.flipped ? hf.faceState : hf.pileState;
-            }
-        }
+let pStart=null,pMoved=false,pSat=null,pCube=false;
+let lastTapTime=0, lastTapSat=null;
+let prismeDragHalf=null, prismeDragStart=null;
 
-        const numSvg = showNumbers ? `<text x="84" y="10" font-size="8" fill="rgba(255,255,255,0.55)" text-anchor="end" font-family="monospace">${hf.id}</text>` : '';
-        const backSvg = backIcon ? `<svg class="back-layer" viewBox="0 0 90 44">${renderIcon(backIcon, isF2)}</svg>` : '';
-        const stateAttr = halfState ? ` data-half-state="${halfState}"` : '';
+canvas.addEventListener('pointerdown',e=>{
+    pStart={x:e.clientX,y:e.clientY};pMoved=false;
 
-        return `<div class="face ${position}"${stateAttr}>${backSvg}<svg viewBox="0 0 90 44">${renderIcon(icon, isF2)}${numSvg}</svg></div>`;
-    }
-
-    // ============================================
-    // RENDU PRINCIPAL
-    // ============================================
-    function render() {
-        grid.innerHTML = '';
-        dominoElements = [];
-        updateDimensions();
-
-        for (let i = 0; i < TOTAL; i++) {
-            const col = i % COLS;
-            const row = Math.floor(i / COLS);
-
-            const cellEl = document.createElement('div');
-            cellEl.className = 'cell';
-            cellEl.style.left = (col * CELL_TOTAL) + 'px';
-            cellEl.style.top = (row * CELL_TOTAL) + 'px';
-
-            const domEl = document.createElement('div');
-            domEl.dataset.index = i;
-
-            const cell = cells[i];
-            if (cell) {
-                const state = getCellState(i);
-                const flippedClass = cell.flipped ? ' cell-flipped' : '';
-                domEl.className = `domino ${state}${flippedClass}`;
-                domEl.style.transform = `rotate(${cell.rotation}deg)`;
-
-                // Affichage direct — le flip est géré entièrement en data
-                const topId = cell.topHalfId;
-                const bottomId = cell.bottomHalfId;
-
-                domEl.innerHTML = renderFaceHTML(topId, i, 'top', false) +
-                                  renderFaceHTML(bottomId, i, 'bottom', false);
-            } else {
-                domEl.className = 'domino empty';
-                domEl.innerHTML = '<div class="face top"></div><div class="face bottom"></div>';
-            }
-
-            cellEl.appendChild(domEl);
-            grid.appendChild(cellEl);
-            dominoElements.push(domEl);
-        }
-
-    }
-
-    // ============================================
-    // ROTATION (TAP BIDIRECTIONNEL)
-    // ============================================
-    function rotateDomino(cellIdx, clockwise) {
-        const cell = cells[cellIdx];
-        if (!cell) return;
-        saveState();
-
-        cell.rotation += clockwise ? 90 : -90;
-        lastMovedIndices = [cellIdx];
-
-        const el = dominoElements[cellIdx];
-        if (el) {
-            el.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-            el.style.transform = `rotate(${cell.rotation}deg)`;
-            setTimeout(() => checkFusions(), 300);
-        }
-    }
-
-    // ============================================
-    // GHOSTS (WRAP-AROUND)
-    // ============================================
-    function createGhosts(axis, rowOrCol) {
-        clearGhosts();
-        if (axis === 'horizontal') {
-            for (let c = 0; c < COLS; c++) {
-                const idx = rowOrCol * COLS + c;
-                const cell = cells[idx];
-                if (!cell) continue;
-                const state = getCellState(idx);
-                addGhost(cell, state, idx, c * CELL_TOTAL - COLS * CELL_TOTAL, rowOrCol * CELL_TOTAL, 'x');
-                addGhost(cell, state, idx, c * CELL_TOTAL + COLS * CELL_TOTAL, rowOrCol * CELL_TOTAL, 'x');
-            }
-        } else if (axis === 'vertical') {
-            for (let r = 0; r < ROWS; r++) {
-                const idx = r * COLS + rowOrCol;
-                const cell = cells[idx];
-                if (!cell) continue;
-                const state = getCellState(idx);
-                addGhost(cell, state, idx, rowOrCol * CELL_TOTAL, r * CELL_TOTAL - ROWS * CELL_TOTAL, 'y');
-                addGhost(cell, state, idx, rowOrCol * CELL_TOTAL, r * CELL_TOTAL + ROWS * CELL_TOTAL, 'y');
-            }
-        }
-    }
-
-    function addGhost(cell, state, cellIdx, x, y, axis) {
-        const el = document.createElement('div');
-        el.className = `domino ghost ${state}`;
-        el.style.position = 'absolute';
-        el.style.width = CELL_SIZE + 'px';
-        el.style.height = CELL_SIZE + 'px';
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
-        el.style.transform = `rotate(${cell.rotation}deg)`;
-        el.style.borderRadius = '12px';
-        el.style.overflow = 'hidden';
-
-        let topId = cell.topHalfId, bottomId = cell.bottomHalfId;
-        el.innerHTML = renderFaceHTML(topId, cellIdx, 'top', false) + renderFaceHTML(bottomId, cellIdx, 'bottom', false);
-
-        grid.appendChild(el);
-        const ghostData = { el, idx: cellIdx };
-        if (axis === 'x') ghostData.baseX = x;
-        else ghostData.baseY = y;
-        ghostElements.push(ghostData);
-    }
-
-    function clearGhosts() {
-        ghostElements.forEach(g => g.el.remove());
-        ghostElements = [];
-    }
-
-    // ============================================
-    // DRAG (TAPIS ROULANT + FLIP CELL)
-    // ============================================
-    function startDrag(e) {
-        if (isAnimating) return;
-        const el = e.target.closest('.domino');
-        if (!el || el.classList.contains('ghost') || el.classList.contains('empty')) return;
-        e.preventDefault();
-
-        const idx = parseInt(el.dataset.index);
-        isDragging = true;
-        dragAxis = null;
-        dragRow = Math.floor(idx / COLS);
-        dragCol = idx % COLS;
-        dragOffset = 0;
-        clickedCellIdx = idx;
-
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        dragStartX = clientX;
-        dragStartY = clientY;
-        dragStartTime = Date.now();
-
-        const rect = el.getBoundingClientRect();
-        clickLocalX = clientX - rect.left;
-        initialPositions = [];
-    }
-
-    function moveDrag(e) {
-        if (!isDragging || isAnimating) return;
-        e.preventDefault();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        const deltaX = clientX - dragStartX;
-        const deltaY = clientY - dragStartY;
-
-        if (dragAxis === null) {
-            const threshold = 8;
-            const absDx = Math.abs(deltaX), absDy = Math.abs(deltaY);
-            if (absDx > threshold || absDy > threshold) {
-                const ratio = Math.min(absDx, absDy) / (Math.max(absDx, absDy) || 1);
-                if (ratio > 0.6) {
-                    dragAxis = 'diagonal';
-                } else if (absDx > absDy) {
-                    dragAxis = 'horizontal';
-                    saveState();
-                    for (let c = 0; c < COLS; c++) {
-                        initialPositions.push({ idx: dragRow * COLS + c, baseX: c * CELL_TOTAL });
-                    }
-                    createGhosts('horizontal', dragRow);
-                } else {
-                    dragAxis = 'vertical';
-                    saveState();
-                    for (let r = 0; r < ROWS; r++) {
-                        initialPositions.push({ idx: r * COLS + dragCol, baseY: r * CELL_TOTAL });
-                    }
-                    createGhosts('vertical', dragCol);
-                }
-            }
-        }
-        if (dragAxis === null) return;
-
-        if (dragAxis === 'horizontal') {
-            dragOffset = deltaX;
-            for (const item of initialPositions) {
-                const cellParent = dominoElements[item.idx]?.parentElement;
-                if (cellParent) { cellParent.style.transition = 'none'; cellParent.style.left = (item.baseX + dragOffset) + 'px'; }
-            }
-            for (const ghost of ghostElements) {
-                ghost.el.style.transition = 'none';
-                ghost.el.style.left = (ghost.baseX + dragOffset) + 'px';
-            }
-        } else if (dragAxis === 'vertical') {
-            dragOffset = deltaY;
-            for (const item of initialPositions) {
-                const cellParent = dominoElements[item.idx]?.parentElement;
-                if (cellParent) { cellParent.style.transition = 'none'; cellParent.style.top = (item.baseY + dragOffset) + 'px'; }
-            }
-            for (const ghost of ghostElements) {
-                ghost.el.style.transition = 'none';
-                ghost.el.style.top = (ghost.baseY + dragOffset) + 'px';
-            }
-        } else {
-            dragOffset = Math.abs(deltaX) + Math.abs(deltaY);
-        }
-    }
-
-    function endDrag(e) {
-        if (!isDragging) return;
-        isDragging = false;
-        const elapsed = Date.now() - dragStartTime;
-        const distance = Math.abs(dragOffset);
-
-        // TAP → rotation
-        if (distance < 8 && elapsed < 250 && clickedCellIdx !== null) {
-            rotateDomino(clickedCellIdx, clickLocalX > (CELL_SIZE / 2));
-            clearGhosts();
-            clickedCellIdx = null;
-            dragAxis = null;
-            initialPositions = [];
+    // Si prisme actif, vérifier si on touche une moitié
+    if(prismeState && prismeState.phase==='idle'){
+        const half = getPrismeHalfAt(e.clientX, e.clientY);
+        if(half){
+            prismeDragHalf = half;
+            prismeDragStart = {x:e.clientX, y:e.clientY, origX:half.position.x, origY:half.position.y};
+            canvas.setPointerCapture(e.pointerId);
             return;
         }
-        clickedCellIdx = null;
-
-        if (dragAxis === null) { clearGhosts(); return; }
-
-        if (dragAxis === 'horizontal') {
-            const steps = Math.round(dragOffset / CELL_TOTAL);
-
-            for (const item of initialPositions) {
-                const cellParent = dominoElements[item.idx]?.parentElement;
-                if (!cellParent) continue;
-                const origCol = Math.round(item.baseX / CELL_TOTAL);
-                const newCol = ((origCol + steps) % COLS + COLS) % COLS;
-                const targetX = newCol * CELL_TOTAL;
-                let currentX = item.baseX + dragOffset;
-                while (currentX - targetX > COLS * CELL_TOTAL / 2) currentX -= COLS * CELL_TOTAL;
-                while (targetX - currentX > COLS * CELL_TOTAL / 2) currentX += COLS * CELL_TOTAL;
-                cellParent.style.transition = 'none';
-                cellParent.style.left = currentX + 'px';
-            }
-            grid.offsetHeight;
-            for (const item of initialPositions) {
-                const cellParent = dominoElements[item.idx]?.parentElement;
-                if (!cellParent) continue;
-                const origCol = Math.round(item.baseX / CELL_TOTAL);
-                const newCol = ((origCol + steps) % COLS + COLS) % COLS;
-                cellParent.style.transition = 'left 0.15s ease-out';
-                cellParent.style.left = (newCol * CELL_TOTAL) + 'px';
-            }
-
-            const row = dragRow;
-            const newCells = [], newLastMoved = [];
-            for (let c = 0; c < COLS; c++) {
-                const src = ((c - steps) % COLS + COLS) % COLS;
-                newCells[c] = cells[row * COLS + src];
-                newLastMoved.push(row * COLS + c);
-            }
-            for (let c = 0; c < COLS; c++) cells[row * COLS + c] = newCells[c];
-            lastMovedIndices = newLastMoved;
-
-        } else if (dragAxis === 'vertical') {
-            const steps = Math.round(dragOffset / CELL_TOTAL);
-
-            for (const item of initialPositions) {
-                const cellParent = dominoElements[item.idx]?.parentElement;
-                if (!cellParent) continue;
-                const origRow = Math.round(item.baseY / CELL_TOTAL);
-                const newRow = ((origRow + steps) % ROWS + ROWS) % ROWS;
-                const targetY = newRow * CELL_TOTAL;
-                let currentY = item.baseY + dragOffset;
-                while (currentY - targetY > ROWS * CELL_TOTAL / 2) currentY -= ROWS * CELL_TOTAL;
-                while (targetY - currentY > ROWS * CELL_TOTAL / 2) currentY += ROWS * CELL_TOTAL;
-                cellParent.style.transition = 'none';
-                cellParent.style.top = currentY + 'px';
-            }
-            grid.offsetHeight;
-            for (const item of initialPositions) {
-                const cellParent = dominoElements[item.idx]?.parentElement;
-                if (!cellParent) continue;
-                const origRow = Math.round(item.baseY / CELL_TOTAL);
-                const newRow = ((origRow + steps) % ROWS + ROWS) % ROWS;
-                cellParent.style.transition = 'top 0.15s ease-out';
-                cellParent.style.top = (newRow * CELL_TOTAL) + 'px';
-            }
-
-            const col = dragCol;
-            const newCells = [], newLastMoved = [];
-            for (let r = 0; r < ROWS; r++) {
-                const src = ((r - steps) % ROWS + ROWS) % ROWS;
-                newCells[r] = cells[src * COLS + col];
-                newLastMoved.push(r * COLS + col);
-            }
-            for (let r = 0; r < ROWS; r++) cells[r * COLS + col] = newCells[r];
-            lastMovedIndices = newLastMoved;
-
-        } else if (dragAxis === 'diagonal') {
-            if (distance > 20) {
-                flipCell(dragRow * COLS + dragCol);
-                clearGhosts();
-                dragAxis = null;
-                initialPositions = [];
-                return;
-            }
-        }
-
-        clearGhosts();
-        setTimeout(() => { render(); checkFusions(); }, 160);
-        dragAxis = null;
-        initialPositions = [];
     }
-
-    // ============================================
-    // FLIP CELLULE (SWIPE VERTICAL)
-    // ============================================
-    function flipCell(cellIdx) {
-        if (isAnimating) return;
-        const cell = cells[cellIdx];
-        if (!cell) return;
-        saveState();
-        isAnimating = true;
-
-        const el = dominoElements[cellIdx];
-        const cellParent = el?.parentElement;
-        if (!el || !cellParent) { isAnimating = false; return; }
-
-        // Lancer animation sur le .cell parent (préserve la rotation du domino)
-        cellParent.classList.add('flipping');
-
-        // À 50% (300ms/600ms) : swap le contenu quand le domino est une ligne
-        setTimeout(() => {
-            cell.flipped = !cell.flipped;
-            const topId = cell.topHalfId, bottomId = cell.bottomHalfId;
-            const state = getCellState(cellIdx);
-            const flippedClass = cell.flipped ? ' cell-flipped' : '';
-            el.className = `domino ${state}${flippedClass}`;
-            el.innerHTML = renderFaceHTML(topId, cellIdx, 'top', false) +
-                           renderFaceHTML(bottomId, cellIdx, 'bottom', false);
-        }, 300);
-
-        // Fin animation : render complet + check fusions
-        setTimeout(() => {
-            cellParent.classList.remove('flipping');
-            isAnimating = false;
-            render();
-            setTimeout(() => checkFusions(), 100);
-        }, 620);
+    pSat=getSatAt(e.clientX,e.clientY);pCube=!pSat&&isCubeAt(e.clientX,e.clientY);canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove',e=>{
+    if(prismeDragHalf && prismeDragStart){
+        // Drag de la moitié prismatique
+        const dx = (e.clientX - prismeDragStart.x) * 0.005;
+        const dy = -(e.clientY - prismeDragStart.y) * 0.005;
+        prismeDragHalf.position.x = prismeDragStart.origX + dx;
+        prismeDragHalf.position.y = prismeDragStart.origY + dy;
+        pMoved=true;
+        return;
     }
-
-    // ============================================
-    // FLIP GLOBAL (BOUTON FLIP)
-    // ============================================
-    function flipAll() {
-        if (isAnimating) return;
-        isAnimating = true;
-        saveState();
-
-        const wrapper = document.getElementById('flip-wrapper');
-        wrapper.classList.add('flipping');
-
-        // À 50% (400ms) : invisible → transformer les données
-        setTimeout(() => {
-            isGridFlipped = !isGridFlipped;
-
-            // 1) Toggle pile/face sur chaque cellule
-            for (let i = 0; i < TOTAL; i++) {
-                if (cells[i]) cells[i].flipped = !cells[i].flipped;
-            }
-
-            // 2) Miroir horizontal : swap colonnes gauche↔droite
-            for (let row = 0; row < ROWS; row++) {
-                for (let c = 0; c < Math.floor(COLS / 2); c++) {
-                    const leftIdx = row * COLS + c;
-                    const rightIdx = row * COLS + (COLS - 1 - c);
-                    const tmp = cells[leftIdx];
-                    cells[leftIdx] = cells[rightIdx];
-                    cells[rightIdx] = tmp;
-                }
-            }
-
-            // 3) Inverser la rotation de chaque domino (miroir horizontal)
-            for (let i = 0; i < TOTAL; i++) {
-                if (cells[i]) cells[i].rotation = -cells[i].rotation;
-            }
-
-            render();
-        }, 400);
-
-        // Fin animation
-        setTimeout(() => {
-            wrapper.classList.remove('flipping');
-            isAnimating = false;
-        }, 820);
-    }
-
-    // ============================================
-    // SYSTÈME DE FUSION
-    // ============================================
-    function checkFusions(skipGravity = false) {
-        if (isAnimating) return;
-
-        // Twin (si activé)
-        if (enableTwinFusion) {
-            for (let i = 0; i < TOTAL; i++) {
-                if (!cells[i]) continue;
-                const { x, y } = getPos(i);
-                const iR = getIndex(x+1, y);
-                if (iR !== -1 && cells[iR] && areTwins(i, iR)) { performTwinFusion(i, iR, 'h'); return; }
-                const iB = getIndex(x, y+1);
-                if (iB !== -1 && cells[iB] && areTwins(i, iB)) { performTwinFusion(i, iB, 'v'); return; }
-            }
-        }
-
-        // Chain
-        for (let i = 0; i < TOTAL; i++) {
-            if (!cells[i]) continue;
-            const { x, y } = getPos(i);
-            if (x > 0 && x < COLS-1) {
-                const iL = getIndex(x-1,y), iR = getIndex(x+1,y);
-                if (iL !== -1 && iR !== -1 && cells[iL] && cells[iR]) {
-                    if (checkPairMatch(iL, 'right', i, 'left') && checkPairMatch(i, 'right', iR, 'left')) {
-                        performChainFusion(iL, i, iR, 'h'); return;
-                    }
-                }
-            }
-            if (y > 0 && y < ROWS-1) {
-                const iT = getIndex(x,y-1), iB = getIndex(x,y+1);
-                if (iT !== -1 && iB !== -1 && cells[iT] && cells[iB]) {
-                    if (checkPairMatch(iT, 'bottom', i, 'top') && checkPairMatch(i, 'bottom', iB, 'top')) {
-                        performChainFusion(iT, i, iB, 'v'); return;
-                    }
-                }
-            }
-        }
-
-        // Simple
-        for (let i = 0; i < TOTAL; i++) {
-            if (!cells[i]) continue;
-            const { x, y } = getPos(i);
-            const iR = getIndex(x+1, y);
-            if (iR !== -1 && cells[iR] && checkPairMatch(i, 'right', iR, 'left')) { performSimpleFusion(i, iR, 'h'); return; }
-            const iB = getIndex(x, y+1);
-            if (iB !== -1 && cells[iB] && checkPairMatch(i, 'bottom', iB, 'top')) { performSimpleFusion(i, iB, 'v'); return; }
-        }
-
-        lastMovedIndices = [];
-        if (!skipGravity) applyGravity();
-    }
-
-    // 2 faces adjacentes matchent ?
-    function checkPairMatch(idx1, dir1, idx2, dir2) {
-        const hId1 = getExposedHalfId(idx1, dir1);
-        const hId2 = getExposedHalfId(idx2, dir2);
-        if (!hId1 || !hId2) return false;
-        const icon1 = getDisplayIcon(hId1, idx1);
-        const icon2 = getDisplayIcon(hId2, idx2);
-        const state1 = getVisibleHalfState(hId1, idx1);
-        const state2 = getVisibleHalfState(hId2, idx2);
-        return icon1 && icon2 && icon1 === icon2 && state1 === state2;
-    }
-
-    // Twins
-    function areTwins(idx1, idx2) {
-        const c1 = cells[idx1], c2 = cells[idx2];
-        if (!c1 || !c2) return false;
-        if (getVisibleHalfState(c1.topHalfId, idx1) !== getVisibleHalfState(c2.topHalfId, idx2)) return false;
-
-        const i1t = getDisplayIcon(c1.topHalfId, idx1), i1b = getDisplayIcon(c1.bottomHalfId, idx1);
-        const i2t = getDisplayIcon(c2.topHalfId, idx2), i2b = getDisplayIcon(c2.bottomHalfId, idx2);
-
-        const r1 = ((c1.rotation % 360) + 360) % 360;
-        const r2 = ((c2.rotation % 360) + 360) % 360;
-
-        if (r1 === r2 && i1t === i2t && i1b === i2b) return true;
-        if (Math.abs(r1 - r2) === 180 && i1t === i2b && i1b === i2t) return true;
-        const diff = Math.abs(r1 - r2);
-        if ((diff === 90 || diff === 270) && i1t === i2b && i1b === i2t) return true;
-        return false;
-    }
-
-    // ────────── SIMPLE FUSION ──────────
-    function performSimpleFusion(idx1, idx2, dir) {
-        isAnimating = true;
-        const el1 = dominoElements[idx1], el2 = dominoElements[idx2];
-        if (!el1 || !el2) { isAnimating = false; return; }
-
-        // Percuteur / Percuté
-        const m1 = lastMovedIndices.includes(idx1), m2 = lastMovedIndices.includes(idx2);
-        let peurIdx, puteIdx;
-        if (m1 && !m2)      { peurIdx = idx1; puteIdx = idx2; }
-        else if (m2 && !m1) { peurIdx = idx2; puteIdx = idx1; }
-        else                 { peurIdx = idx1; puteIdx = idx2; }
-
-        // Directions de contact
-        let peurDir, puteDir;
-        if (dir === 'h') {
-            if (peurIdx < puteIdx) { peurDir = 'right'; puteDir = 'left'; }
-            else                   { peurDir = 'left';  puteDir = 'right'; }
-        } else {
-            if (peurIdx < puteIdx) { peurDir = 'bottom'; puteDir = 'top'; }
-            else                   { peurDir = 'top';    puteDir = 'bottom'; }
-        }
-
-        // Demi-faces en contact (pour respawn)
-        const contactPeur = getExposedHalfId(peurIdx, peurDir);
-        const contactPute = getExposedHalfId(puteIdx, puteDir);
-        // Demi-faces restantes (pour le nouveau domino)
-        const remainPeur = getOtherHalfId(peurIdx, peurDir);
-        const remainPute = getOtherHalfId(puteIdx, puteDir);
-
-        // Calcul état — basé sur l'état visible de la demi-face contact
-        const currentState = getVisibleHalfState(contactPute, puteIdx);
-        const nextStateIdx = Math.min(STATE_ORDER.indexOf(currentState) + 1, STATE_ORDER.length - 1);
-        const nextState = STATE_ORDER[nextStateIdx];
-
-        // Score
-        const basePoints = currentState !== 'white' ? ({ silver: 1000, gold: 3000, emerald: 5000, cosmic: 10000, supernovae: 25000 }[currentState] || POINTS.simple) : POINTS.simple;
-        const points = addScore(basePoints, 'simple', [currentState]);
-        const rect = el2.getBoundingClientRect();
-        showFloatingPoints(points, rect.left + rect.width/2, rect.top);
-        if (nextState !== 'white' && fusionCounts[nextState] !== undefined) fusionCounts[nextState]++;
-
-        el1.classList.add('fusing'); el2.classList.add('fusing');
-
-        // Mémoriser le côté visible au moment de la fusion (pour dual state)
-        const fusionFlipped = cells[puteIdx]?.flipped || false;
-
-        setTimeout(() => {
-            // Nouveau domino à la position du percuté
-            // En dual state : seul le côté visible monte
-            setHalfState(remainPeur, nextState, { flipped: fusionFlipped });
-            setHalfState(remainPute, nextState, { flipped: fusionFlipped });
-            const finalRot = dir === 'h' ? 90 : 0;
-            cells[puteIdx] = { topHalfId: remainPeur, bottomHalfId: remainPute, rotation: finalRot, flipped: false };
-
-            // Percuteur disparaît
-            cells[peurIdx] = null;
-
-            if (enableRespawn) {
-                if (!inheritRespawn) {
-                    resetHalfState(contactPeur);
-                    resetHalfState(contactPute);
-                }
-                // inheritRespawn ON → les demi-faces gardent leur pileState/faceState actuels
-                const respawn = { topHalfId: contactPeur, bottomHalfId: contactPute, rotation: dir === 'h' ? 90 : 0, flipped: false };
-                render();
-                setTimeout(() => { isAnimating = false; applyGravityThenRespawn([respawn]); }, FUSION_APPEAR);
+    if(pStart&&Math.hypot(e.clientX-pStart.x,e.clientY-pStart.y)>10)pMoved=true;
+});
+canvas.addEventListener('pointerup',e=>{
+    // Fin du drag de moitié prismatique
+    if(prismeDragHalf && prismeState){
+        if(pMoved){
+            // Vérifier si on a droppé sur un satellite
+            const dropSat = getSatAt(e.clientX, e.clientY);
+            if(dropSat && dropSat !== prismeState.sat && !dropSat.locked && dropSat.tableau === mod(currentIdx)){
+                prismeRecombine(prismeDragHalf, dropSat);
             } else {
-                delete halfFaces[contactPeur];
-                delete halfFaces[contactPute];
-                render();
-                setTimeout(() => { isAnimating = false; applyGravity(); }, FUSION_APPEAR);
+                // Retour à la position idle
+                prismeState.phase = 'split';
+                prismeState.t = 0.4; // skip to end of split
             }
-        }, FUSION_MOVE);
+        } else {
+            // Tap simple sur une moitié → annuler
+            cancelPrisme();
+        }
+        prismeDragHalf=null;prismeDragStart=null;pStart=null;pMoved=false;
+        return;
     }
 
-    // ────────── CHAIN FUSION ──────────
-    function performChainFusion(idx1, idx2, idx3, dir) {
-        isAnimating = true;
-        const el1 = dominoElements[idx1], el2 = dominoElements[idx2], el3 = dominoElements[idx3];
-        if (!el1 || !el2 || !el3) { isAnimating = false; return; }
-
-        const m1 = lastMovedIndices.includes(idx1), m2 = lastMovedIndices.includes(idx2), m3 = lastMovedIndices.includes(idx3);
-        let peurIdx, puteIdx;
-        if ((m1 || m2) && !m3)      { peurIdx = idx1; puteIdx = idx3; }
-        else if ((m3 || m2) && !m1) { peurIdx = idx3; puteIdx = idx1; }
-        else                         { peurIdx = idx1; puteIdx = idx3; }
-
-        let peurDir, puteDir;
-        if (dir === 'h') {
-            if (peurIdx === idx1) { peurDir = 'right'; puteDir = 'left'; }
-            else                  { peurDir = 'left';  puteDir = 'right'; }
-        } else {
-            if (peurIdx === idx1) { peurDir = 'bottom'; puteDir = 'top'; }
-            else                  { peurDir = 'top';    puteDir = 'bottom'; }
+    if(!pStart)return;const dx=e.clientX-pStart.x,dy=e.clientY-pStart.y,dist=Math.hypot(dx,dy);
+    if(!pMoved){
+        // Si prisme actif et tap dans le vide → annuler
+        if(prismeState){
+            cancelPrisme();
+            pStart=null;pSat=null;pCube=false;
+            return;
         }
 
-        const percuteur = cells[peurIdx], percute = cells[puteIdx], centre = cells[idx2];
-        const remainPeur = getOtherHalfId(peurIdx, peurDir);
-        const remainPute = getOtherHalfId(puteIdx, puteDir);
-        const contactPeur = getExposedHalfId(peurIdx, peurDir);
-        const contactPute = getExposedHalfId(puteIdx, puteDir);
-        const d2top = centre.topHalfId, d2bot = centre.bottomHalfId;
-
-        const currentState = getVisibleHalfState(d2top, idx2);
-        const nextStateIdx = Math.min(STATE_ORDER.indexOf(currentState) + 2, STATE_ORDER.length - 1);
-        const nextState = STATE_ORDER[nextStateIdx];
-
-        const basePoints = currentState !== 'white' ? ({ silver: 2000, gold: 5000, emerald: 10000, cosmic: 20000, supernovae: 50000 }[currentState] || POINTS.chain) : POINTS.chain;
-        const points = addScore(basePoints, 'chain', [currentState]);
-        const rect = el2.getBoundingClientRect();
-        showFloatingPoints(points, rect.left + rect.width/2, rect.top);
-        if (nextState !== 'white' && fusionCounts[nextState] !== undefined) fusionCounts[nextState]++;
-
-        el1.classList.add('fusing'); el2.classList.add('fusing'); el3.classList.add('fusing');
-
-        const fusionFlipped = cells[idx2]?.flipped || false;
-
-        setTimeout(() => {
-            // Résultat au centre
-            setHalfState(remainPeur, nextState, { flipped: fusionFlipped });
-            setHalfState(remainPute, nextState, { flipped: fusionFlipped });
-            cells[idx2] = { topHalfId: remainPeur, bottomHalfId: remainPute, rotation: centre.rotation, flipped: false };
-
-            cells[idx1] = null;
-            cells[idx3] = null;
-
-            if (enableRespawn) {
-                if (!inheritRespawn) {
-                    resetHalfState(contactPeur);
-                    resetHalfState(d2top);
-                    resetHalfState(contactPute);
-                    resetHalfState(d2bot);
-                }
-                const rot = dir === 'h' ? 90 : 0;
-                const respawns = [
-                    { topHalfId: contactPeur, bottomHalfId: d2top, rotation: rot, flipped: false },
-                    { topHalfId: d2bot, bottomHalfId: contactPute, rotation: rot, flipped: false }
-                ];
-                render();
-                setTimeout(() => { isAnimating = false; applyGravityThenRespawn(respawns); }, FUSION_APPEAR);
+        const sat=getSatAt(e.clientX,e.clientY);
+        if(sat){
+            const now=Date.now();
+            // Double-tap detection
+            if(lastTapSat===sat && now-lastTapTime<400 && !sat.locked){
+                // Double-tap → activer le prisme
+                if(lockedSat) tapRelease(lockedSat);
+                activatePrisme(sat);
+                lastTapSat=null;lastTapTime=0;
             } else {
-                delete halfFaces[contactPeur];
-                delete halfFaces[d2top];
-                delete halfFaces[contactPute];
-                delete halfFaces[d2bot];
-                render();
-                setTimeout(() => { isAnimating = false; applyGravity(); }, FUSION_APPEAR);
+                // Simple tap normal
+                if(sat.locked)tapRelease(sat);else tapLock(sat);
+                lastTapSat=sat;lastTapTime=now;
             }
-        }, FUSION_MOVE);
-    }
-
-    // ────────── TWIN FUSION ──────────
-    function performTwinFusion(idx1, idx2, dir) {
-        isAnimating = true;
-        const c1 = cells[idx1], c2 = cells[idx2];
-        const currentState = getVisibleHalfState(c1.topHalfId, idx1);
-        const nextStateIdx = Math.min(STATE_ORDER.indexOf(currentState) + 2, STATE_ORDER.length - 1);
-        const nextState = STATE_ORDER[nextStateIdx];
-
-        const points = addScore(POINTS.twin, 'twin', [currentState]);
-        const el1 = dominoElements[idx1];
-        if (el1) { const rect = el1.getBoundingClientRect(); showFloatingPoints(points, rect.left + rect.width/2, rect.top); }
-
-        if (STATE_ORDER.indexOf(nextState) >= STATE_ORDER.indexOf('silver')) fusionCounts.silver++;
-        if (STATE_ORDER.indexOf(nextState) >= STATE_ORDER.indexOf('gold')) fusionCounts.gold++;
-        if (STATE_ORDER.indexOf(nextState) >= STATE_ORDER.indexOf('emerald')) fusionCounts.emerald++;
-        if (STATE_ORDER.indexOf(nextState) >= STATE_ORDER.indexOf('cosmic')) fusionCounts.cosmic++;
-        if (STATE_ORDER.indexOf(nextState) >= STATE_ORDER.indexOf('supernovae')) fusionCounts.supernovae++;
-
-        const fusionFlipped1 = c1.flipped || false;
-        const fusionFlipped2 = c2.flipped || false;
-
-        if (enableRespawn) {
-            setHalfState(c1.topHalfId, nextState, { flipped: fusionFlipped1 });
-            setHalfState(c1.bottomHalfId, nextState, { flipped: fusionFlipped1 });
-            setHalfState(c2.topHalfId, nextState, { flipped: fusionFlipped2 });
-            setHalfState(c2.bottomHalfId, nextState, { flipped: fusionFlipped2 });
-
-            const respawns = [
-                { topHalfId: c1.topHalfId, bottomHalfId: c1.bottomHalfId, rotation: c1.rotation, flipped: false },
-                { topHalfId: c2.topHalfId, bottomHalfId: c2.bottomHalfId, rotation: c2.rotation, flipped: false }
-            ];
-
-            setTimeout(() => {
-                cells[idx1] = null;
-                cells[idx2] = null;
-                render();
-                isAnimating = false;
-                applyGravityThenRespawn(respawns);
-            }, FUSION_MOVE);
-        } else {
-            setTimeout(() => {
-                delete halfFaces[c1.topHalfId];
-                delete halfFaces[c1.bottomHalfId];
-                delete halfFaces[c2.topHalfId];
-                delete halfFaces[c2.bottomHalfId];
-                cells[idx1] = null;
-                cells[idx2] = null;
-                render();
-                isAnimating = false;
-                applyGravity();
-            }, FUSION_MOVE);
+        }
+        else if(lockedSat)tapRelease(lockedSat);
+    } else if(dist>=15){
+        if(prismeState){pStart=null;pSat=null;pCube=false;return;} // pas de swipe pendant prisme
+        // Swipe depuis la porte
+        if(pCube){
+            let dirX=0,dirY=0;
+            if(Math.abs(dx)>Math.abs(dy)){dirX=dx>0?1:-1;}
+            else{dirY=dy>0?-1:1;}
+            if(dragPorte(dirX,dirY)){pStart=null;pSat=null;pCube=false;return;}
+        }
+        // Swipe depuis un satellite (swap entre sats si non-white)
+        if(pSat&&!pSat.locked){
+            let dirX=0,dirY=0;
+            const st=pSat.state||'white';
+            if(st==='gold'){
+                dirX=dx>0?1:-1;
+                dirY=dy>0?-1:1;
+            } else {
+                if(Math.abs(dx)>Math.abs(dy)){dirX=dx>0?1:-1;}
+                else{dirY=dy>0?-1:1;}
+            }
+            if(dragSwap(pSat,dirX,dirY)){pStart=null;pSat=null;pCube=false;return;}
+        }
+        if(Math.abs(dx)>=Math.abs(dy)){dx>0?navRight():navLeft();}
+        else{
+            const tiltDir = dy>0 ? 1 : -1;
+            if(!tiltGravity(tiltDir)){
+                dy<0?flipUp():flipDown();
+            }
         }
     }
+    pStart=null;pSat=null;pCube=false;
+});
+canvas.addEventListener('pointercancel',()=>{pStart=null;pSat=null;pCube=false;prismeDragHalf=null;prismeDragStart=null;});
 
-    // ============================================
-    // GRAVITÉ & RESPAWN
-    // ============================================
-    function applyGravity(callback) {
-        let moved = false;
-        for (let x = 0; x < COLS; x++) {
-            for (let y = ROWS - 2; y >= 0; y--) {
-                const idx = getIndex(x, y);
-                if (cells[idx]) {
-                    let targetY = y;
-                    while (targetY < ROWS - 1 && !cells[getIndex(x, targetY + 1)]) targetY++;
-                    if (targetY !== y) {
-                        const tIdx = getIndex(x, targetY);
-                        cells[tIdx] = cells[idx];
-                        cells[idx] = null;
-                        moved = true;
-                    }
+// ═══ WHEEL + KEY ═══
+
+let wx=0,wy=0,wcd=false,wt=null;
+canvas.addEventListener('wheel',e=>{
+    e.preventDefault();
+    if(wcd||busy||isAnimating||tiltAnim)return;
+    if(Math.abs(e.deltaX)>Math.abs(e.deltaY)){wx+=e.deltaX;}else{wy+=e.deltaY;}
+    clearTimeout(wt);wt=setTimeout(()=>{wx=0;wy=0;},100);
+    if(Math.abs(wx)>50){
+        wx>0?navRight():navLeft();
+        wx=0;wy=0;wcd=true;setTimeout(()=>{wcd=false;},600);
+    } else if(Math.abs(wy)>50){
+        wy>0?flipDown():flipUp();
+        wx=0;wy=0;wcd=true;setTimeout(()=>{wcd=false;},600);
+    }
+},{passive:false});
+document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'){navRight();e.preventDefault();}
+    else if(e.key==='ArrowLeft'){navLeft();e.preventDefault();}
+    else if(e.key==='ArrowUp'){if(e.shiftKey)flipUp();else if(!tiltGravity(-1))flipUp();e.preventDefault();}
+    else if(e.key==='ArrowDown'){if(e.shiftKey)flipDown();else if(!tiltGravity(1))flipDown();e.preventDefault();}
+    else if(e.key==='Escape'&&prismeState){cancelPrisme();e.preventDefault();}
+});
+
+// ═══ UI ═══
+
+const dotsEl=document.getElementById('navDots');
+for(let i=0;i<TOTAL;i++){const d=document.createElement('div');d.className='nav-dot'+(i===0?' active':'');dotsEl.appendChild(d);}
+function updateUI(){
+    const idx=mod(currentIdx);
+    const flipTag=isFlipped?' ⟳':'';
+    document.getElementById('faceLabel').textContent=`${idx+1} / ${TOTAL}${flipTag}`;
+    dotsEl.querySelectorAll('.nav-dot').forEach((d,i)=>d.classList.toggle('active',i===idx));
+    const c=sats.filter(s=>s.tableau===idx&&!s.locked).length;
+    let t=`T${idx+1} [porte] · ${c} sat${c>1?'s':''}`;if(lockedSat)t+=` · ⟐ flotte`;
+    if(isFlipped)t+=` · retourné`;
+    if(prismeState)t+=` · ◇ prisme`;
+    document.getElementById('infoLine').textContent=t;
+}
+
+// ═══ RESET ═══
+
+document.getElementById('btnReset').addEventListener('click',()=>{
+    if(prismeState) cancelPrisme();
+    if(lockedSat){cubeGroup.attach(lockedSat.mesh);lockedSat.locked=false;}lockedSat=null;
+    let si=0;TABLEAUX.forEach((tab,tIdx)=>{tab.sats.forEach(sd=>{
+        const sat=sats[si++];sat.value=sd.v;sat.state=sd.state||'white';sat.tableau=tIdx;sat.origTableau=tIdx;
+        sat.lx=sd.x;sat.ly=sd.y;sat.origLx=sd.x;sat.origLy=sd.y;sat.locked=false;
+        if(sat.mesh.parent!==cubeGroup)cubeGroup.attach(sat.mesh);sat.mesh.scale.set(1,1,1);
+        const ud=sat.mesh.userData;ud.glowMesh.material.opacity=0;ud.haloMesh.material.opacity=0;
+        const tint=sat.state!=='white'?sat.state:'normal';
+        ud.numMesh.material.map=getDominoTex(sd.v[0],sd.v[1],tint);
+    });});
+    updatePorte([13,11]);cubeGroup.quaternion.identity();targetQuat.identity();
+    currentIdx=0;isAnimating=false;busy=false;navDir=0;flipDir=0;isFlipped=false;
+    refreshZoom();camera.position.set(targetCamX,0,targetCamZ);assignFaces();updateUI();
+});
+
+// ═══ EXPORT JSON ═══
+
+document.getElementById('btnExport').addEventListener('click',()=>{
+    const data={tableaux:[]};
+    // Regrouper les sats par tableau
+    const groups={};
+    sats.forEach(s=>{
+        if(!groups[s.tableau]) groups[s.tableau]=[];
+        const entry={x:Math.round(s.lx*100)/100, y:Math.round(s.ly*100)/100, v:[...s.value]};
+        if(s.state&&s.state!=='white') entry.state=s.state;
+        groups[s.tableau].push(entry);
+    });
+    // Trier par index de tableau
+    const keys=Object.keys(groups).map(Number).sort((a,b)=>a-b);
+    keys.forEach(k=>{
+        data.tableaux.push({name:'T'+(k+1), sats:groups[k]});
+    });
+    data.porte=[...porteValue];
+    const json=JSON.stringify(data,null,2);
+    // Copier dans le presse-papier
+    navigator.clipboard.writeText(json).then(()=>{
+        document.getElementById('infoLine').textContent='JSON copié !';
+        setTimeout(updateUI,1500);
+    }).catch(()=>{
+        // Fallback: prompt
+        prompt('JSON exporté :', json);
+    });
+});
+
+// ═══ AXE CENTRAL ═══
+
+document.getElementById('btnCenter').addEventListener('click',()=>{
+    const el=document.getElementById('centerLine');
+    el.style.display=el.style.display==='none'?'block':'none';
+});
+
+// ═══ BACKGROUND MODES — multi-couches scrollantes ═══
+
+const BG_MODES = ['stars','grid','nebula','dust','off'];
+const BG_LABELS = ['étoiles ✦','grille ⊞','nebula ☁','poussière ·','off'];
+let bgMode = 0;
+
+// ── Mode 0 : Étoiles — 3 couches à profondeurs différentes ──
+const starLayers = [];
+const STAR_CONFIGS = [
+    {count:80,  depth:[-8,-25],  speed:2.5, size:0.18, opacity:0.55, spread:50},
+    {count:150, depth:[-25,-55], speed:1.2, size:0.10, opacity:0.35, spread:65},
+    {count:250, depth:[-55,-90], speed:0.4, size:0.05, opacity:0.18, spread:80},
+];
+STAR_CONFIGS.forEach(cfg=>{
+    const geo=new THREE.BufferGeometry();
+    const pos=new Float32Array(cfg.count*3);
+    const speeds=new Float32Array(cfg.count);
+    for(let i=0;i<cfg.count;i++){
+        pos[i*3]=(Math.random()-0.5)*cfg.spread;
+        pos[i*3+1]=(Math.random()-0.5)*cfg.spread*0.7;
+        pos[i*3+2]=cfg.depth[0]+Math.random()*(cfg.depth[1]-cfg.depth[0]);
+        speeds[i]=cfg.speed*(0.5+Math.random());
+    }
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    const mat=new THREE.PointsMaterial({color:0x7ec8e3,size:cfg.size,transparent:true,opacity:cfg.opacity,depthWrite:false});
+    const pts=new THREE.Points(geo,mat);
+    scene.add(pts);
+    starLayers.push({pts,geo,speeds,cfg});
+});
+
+// ── Mode 1 : Grille — 2 couches (proche + lointaine) ──
+const gridLayers = [];
+const GRID_CONFIGS = [
+    {depth:-12, step:2,  span:40, opacity:0.09, color:0x7ec8e3, scrollSpeed:0.8},
+    {depth:-35, step:4,  span:60, opacity:0.04, color:0x5a9ab5, scrollSpeed:0.3},
+];
+GRID_CONFIGS.forEach(cfg=>{
+    const grp=new THREE.Group();
+    const mat=new THREE.LineBasicMaterial({color:cfg.color,transparent:true,opacity:cfg.opacity,depthWrite:false});
+    for(let x=-cfg.span;x<=cfg.span;x+=cfg.step){
+        const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,-cfg.span,cfg.depth),new THREE.Vector3(x,cfg.span,cfg.depth)]);
+        grp.add(new THREE.Line(g,mat));
+    }
+    for(let y=-cfg.span;y<=cfg.span;y+=cfg.step){
+        const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-cfg.span,y,cfg.depth),new THREE.Vector3(cfg.span,y,cfg.depth)]);
+        grp.add(new THREE.Line(g,mat));
+    }
+    grp.visible=false;
+    scene.add(grp);
+    gridLayers.push({grp,cfg});
+});
+
+// ── Mode 2 : Nebula — 3 couches de brume ──
+const nebulaLayers = [];
+const NEB_CONFIGS = [
+    {count:5,  depth:[-10,-20], scale:[10,18], opacity:0.10, speed:0.20, hueRange:[190,220]},
+    {count:8,  depth:[-25,-40], scale:[12,22], opacity:0.06, speed:0.10, hueRange:[200,230]},
+    {count:6,  depth:[-45,-65], scale:[15,28], opacity:0.03, speed:0.05, hueRange:[210,240]},
+];
+NEB_CONFIGS.forEach(cfg=>{
+    const grp=new THREE.Group();
+    const sprites=[];
+    for(let i=0;i<cfg.count;i++){
+        const nc=document.createElement('canvas'); nc.width=128; nc.height=128;
+        const nctx=nc.getContext('2d');
+        const hue=cfg.hueRange[0]+Math.random()*(cfg.hueRange[1]-cfg.hueRange[0]);
+        const ng=nctx.createRadialGradient(64,64,0,64,64,64);
+        ng.addColorStop(0,`hsla(${hue},60%,60%,${cfg.opacity})`);
+        ng.addColorStop(0.4,`hsla(${hue},50%,40%,${cfg.opacity*0.5})`);
+        ng.addColorStop(1,'rgba(0,0,0,0)');
+        nctx.fillStyle=ng; nctx.fillRect(0,0,128,128);
+        const nTex=new THREE.CanvasTexture(nc);
+        const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:nTex,transparent:true,opacity:0.7,depthWrite:false}));
+        const sc=cfg.scale[0]+Math.random()*(cfg.scale[1]-cfg.scale[0]);
+        sp.scale.set(sc,sc,1);
+        sp.position.set((Math.random()-0.5)*55,(Math.random()-0.5)*35,cfg.depth[0]+Math.random()*(cfg.depth[1]-cfg.depth[0]));
+        sp.userData.vx=(Math.random()-0.5)*cfg.speed;
+        sp.userData.vy=(Math.random()-0.5)*cfg.speed*0.5;
+        sprites.push(sp);
+        grp.add(sp);
+    }
+    grp.visible=false;
+    scene.add(grp);
+    nebulaLayers.push({grp,sprites,cfg});
+});
+
+// ── Mode 3 : Poussière cosmique — 3 couches ──
+const dustLayers = [];
+const DUST_CONFIGS = [
+    {count:60,  depth:[-3,-15],  size:0.08, opacity:0.40, driftSpeed:0.08, spread:35},
+    {count:100, depth:[-15,-35], size:0.05, opacity:0.25, driftSpeed:0.04, spread:45},
+    {count:150, depth:[-35,-60], size:0.03, opacity:0.12, driftSpeed:0.02, spread:60},
+];
+DUST_CONFIGS.forEach(cfg=>{
+    const geo=new THREE.BufferGeometry();
+    const pos=new Float32Array(cfg.count*3);
+    const vel=[];
+    for(let i=0;i<cfg.count;i++){
+        pos[i*3]=(Math.random()-0.5)*cfg.spread;
+        pos[i*3+1]=(Math.random()-0.5)*cfg.spread*0.7;
+        pos[i*3+2]=cfg.depth[0]+Math.random()*(cfg.depth[1]-cfg.depth[0]);
+        vel.push({x:(Math.random()-0.5)*cfg.driftSpeed, y:(Math.random()-0.5)*cfg.driftSpeed*0.6, z:(Math.random()-0.5)*cfg.driftSpeed*0.3});
+    }
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    const mat=new THREE.PointsMaterial({color:0x7ec8e3,size:cfg.size,transparent:true,opacity:cfg.opacity,depthWrite:false});
+    const pts=new THREE.Points(geo,mat);
+    pts.visible=false;
+    scene.add(pts);
+    dustLayers.push({pts,geo,vel,cfg});
+});
+
+// ── Visibility ──
+function updateBgVisibility(){
+    starLayers.forEach(l=>l.pts.visible=(bgMode===0));
+    gridLayers.forEach(l=>l.grp.visible=(bgMode===1));
+    nebulaLayers.forEach(l=>l.grp.visible=(bgMode===2));
+    dustLayers.forEach(l=>l.pts.visible=(bgMode===3));
+}
+updateBgVisibility();
+
+// ── Tick ──
+function tickBg(t, dt){
+    // Étoiles multi-couches — chaque couche scroll à sa vitesse
+    if(bgMode===0){
+        starLayers.forEach(layer=>{
+            const p=layer.geo.attributes.position.array;
+            const n=layer.cfg.count;
+            for(let i=0;i<n;i++){
+                p[i*3+2]+=layer.speeds[i]*dt;
+                if(p[i*3+2]>layer.cfg.depth[0]+5){
+                    p[i*3+2]=layer.cfg.depth[1];
+                    p[i*3]=(Math.random()-0.5)*layer.cfg.spread;
+                    p[i*3+1]=(Math.random()-0.5)*layer.cfg.spread*0.7;
                 }
             }
-        }
-        if (moved) {
-            render();
-            setTimeout(() => applyGravity(callback), GRAVITY_DELAY);
-        } else {
-            if (callback) callback();
-            else setTimeout(checkFusions, 50);
-        }
-    }
-
-    function applyGravityThenRespawn(respawns) {
-        applyGravity(() => { setTimeout(() => respawnInEmptyCells(respawns), 150); });
-    }
-
-    function respawnInEmptyCells(respawns) {
-        let spawned = 0;
-        // Spawn en haut d'abord
-        for (let c = 0; c < COLS && spawned < respawns.length; c++) {
-            if (!cells[c]) { cells[c] = respawns[spawned++]; }
-        }
-        // Si plein en haut, chercher n'importe quelle case vide
-        for (let i = 0; i < TOTAL && spawned < respawns.length; i++) {
-            if (!cells[i]) { cells[i] = respawns[spawned++]; }
-        }
-        dominoSequenceIndex++;
-        render();
-        setTimeout(() => applyGravity(), 100);
-    }
-
-    // ============================================
-    // SCORING
-    // ============================================
-    function addScore(basePoints, fusionType, states) {
-        const now = Date.now();
-        let stateMultiplier = 1;
-        states.forEach(s => { stateMultiplier = Math.max(stateMultiplier, STATE_MULTIPLIER[s] || 1); });
-        if (now - lastFusionTime < 2000 && lastFusionTime > 0) comboCount++; else comboCount = 1;
-        lastFusionTime = now;
-        const comboMultiplier = 1 + (comboCount - 1) * 0.5;
-        const pts = Math.round(basePoints * stateMultiplier * comboMultiplier);
-        score += pts;
-        if (score > bestScore) bestScore = score;
-        return pts;
-    }
-
-    function showFloatingPoints(points, x, y) {
-        if (!showPointsAnimation) return;
-        const el = document.createElement('div');
-        el.className = 'floating-points';
-        el.textContent = `+${points.toLocaleString()}`;
-        el.style.left = `${x}px`; el.style.top = `${y}px`;
-        document.body.appendChild(el);
-        setTimeout(() => el.remove(), 1000);
-    }
-
-    // ============================================
-    // UNDO / SAVE STATE
-    // ============================================
-    function saveState() {
-        history.push({
-            halfFaces: JSON.parse(JSON.stringify(halfFaces)),
-            cells: JSON.parse(JSON.stringify(cells)),
-            halfIdCounter: halfIdCounter
+            layer.geo.attributes.position.needsUpdate=true;
         });
-        scoreHistory.push(score);
-        if (history.length > MAX_HISTORY) { history.shift(); scoreHistory.shift(); }
     }
-
-    function undo() {
-        if (history.length === 0 || isAnimating) return;
-        const state = history.pop();
-        halfFaces = state.halfFaces;
-        cells = state.cells;
-        halfIdCounter = state.halfIdCounter;
-        score = scoreHistory.pop();
-        render();
+    // Grille multi-couches — chaque couche scroll Y à sa vitesse
+    if(bgMode===1){
+        gridLayers.forEach(layer=>{
+            layer.grp.position.y=-((t*layer.cfg.scrollSpeed)%layer.cfg.step);
+        });
     }
-
-    // ============================================
-    // INIT / RESET
-    // ============================================
-    function resetGame() {
-        if (isAnimating) return;
-        history = []; scoreHistory = [];
-        score = 0; comboCount = 0; lastFusionTime = 0;
-        fusionCounts = { silver: 0, gold: 0, emerald: 0, cosmic: 0, supernovae: 0 };
-        dominoSequenceIndex = 1;
-        lastMovedIndices = [];
-        halfIdCounter = 0;
-        halfFaces = {};
-        cells = [];
-        isGridFlipped = false;
-        document.getElementById('flip-wrapper').classList.remove('flipping');
-
-        const rng = seededRandom(LEVEL_SEEDS[currentLevel]);
-        const iconKeys = getIconKeysForLevel(currentLevel);
-
-        // ── Distribution équilibrée ──
-        // 18 demi-faces → répartir les icônes uniformément pour pile ET face
-        // avec contrainte : pileIcon ≠ faceIcon sur chaque demi-face
-        function buildBalancedPool(keys, count, rngFn) {
-            const pool = [];
-            const full = Math.floor(count / keys.length);
-            const remainder = count % keys.length;
-            for (let i = 0; i < keys.length; i++) {
-                const n = full + (i < remainder ? 1 : 0);
-                for (let j = 0; j < n; j++) pool.push(keys[i]);
+    // Nebula multi-couches — drift lent par couche
+    if(bgMode===2){
+        nebulaLayers.forEach(layer=>{
+            layer.sprites.forEach(s=>{
+                s.position.x+=s.userData.vx*dt;
+                s.position.y+=s.userData.vy*dt;
+                if(s.position.x>30)s.position.x=-30;
+                if(s.position.x<-30)s.position.x=30;
+                if(s.position.y>20)s.position.y=-20;
+                if(s.position.y<-20)s.position.y=20;
+            });
+        });
+    }
+    // Poussière multi-couches — drift organique
+    if(bgMode===3){
+        dustLayers.forEach(layer=>{
+            const p=layer.geo.attributes.position.array;
+            const hl=layer.cfg.spread/2;
+            for(let i=0;i<layer.cfg.count;i++){
+                p[i*3]+=layer.vel[i].x*dt;
+                p[i*3+1]+=layer.vel[i].y*dt;
+                p[i*3+2]+=layer.vel[i].z*dt;
+                if(Math.abs(p[i*3])>hl)layer.vel[i].x*=-1;
+                if(Math.abs(p[i*3+1])>hl*0.7)layer.vel[i].y*=-1;
+                if(p[i*3+2]>layer.cfg.depth[0])layer.vel[i].z*=-1;
+                if(p[i*3+2]<layer.cfg.depth[1])layer.vel[i].z*=-1;
             }
-            // Shuffle Fisher-Yates
-            for (let i = pool.length - 1; i > 0; i--) {
-                const j = Math.floor(rngFn() * (i + 1));
-                [pool[i], pool[j]] = [pool[j], pool[i]];
-            }
-            return pool;
+            layer.geo.attributes.position.needsUpdate=true;
+        });
+    }
+}
+
+// ── Bouton switcher ──
+document.getElementById('btnBg').addEventListener('click',()=>{
+    bgMode=(bgMode+1)%BG_MODES.length;
+    updateBgVisibility();
+    document.getElementById('btnBg').textContent='fond: '+BG_LABELS[bgMode];
+});
+
+// ═══ TRANSPARENCE DOMINOS ═══
+let domAlpha = 1.0;
+document.getElementById('sliderAlpha').addEventListener('input',(e)=>{
+    domAlpha = parseInt(e.target.value)/100;
+    document.getElementById('alphaVal').textContent=e.target.value+'%';
+    sats.forEach(sat=>{
+        const ud=sat.mesh.userData;
+        if(ud.bgMesh) ud.bgMesh.material.opacity=domAlpha;
+        if(ud.boxMesh){
+            if(Array.isArray(ud.boxMesh.material)){
+                ud.boxMesh.material.forEach(m=>{ m.opacity=m._baseOp*domAlpha; });
+            } else { ud.boxMesh.material.opacity=ud.boxMesh.material._baseOp*domAlpha; }
+        }
+        if(ud.shadowMesh) ud.shadowMesh.material.opacity=0.6*domAlpha;
+    });
+});
+
+// ═══ PRISME (décomposition chromatique) ═══
+
+let prismeState = null; // {sat, halfA, halfB, phase, t, dragHalf, origPos}
+
+function createHalfMesh(iconIdx, tint, zOff){
+    const SZ=0.85;
+    const grp=new THREE.Group();
+    const plane=new THREE.Mesh(
+        new THREE.PlaneGeometry(SZ, SZ),
+        new THREE.MeshBasicMaterial({map:getSingleIconTex(iconIdx, tint), transparent:true, side:THREE.DoubleSide, opacity:0.9})
+    );
+    plane.position.z = zOff;
+    grp.add(plane);
+    // Fond semi-transparent
+    const bgMesh=new THREE.Mesh(
+        new THREE.PlaneGeometry(SZ, SZ),
+        new THREE.MeshBasicMaterial({map:getDominoBgTex('normal'), transparent:true, opacity:0.6, side:THREE.DoubleSide})
+    );
+    bgMesh.position.z = zOff - 0.001;
+    grp.add(bgMesh);
+    grp.userData = {isSat:true, isPrismeHalf:true, iconIdx, plane, bgMesh};
+    return grp;
+}
+
+function activatePrisme(sat){
+    if(busy||isAnimating||swapAnim||tiltAnim||prismeState) return false;
+    if(sat.locked) return false;
+
+    const fIdx=mod(currentIdx);
+    if(sat.tableau!==fIdx) return false;
+
+    // Créer les deux moitiés
+    const halfA = createHalfMesh(sat.value[0], 'prisme_cyan', 0.15);
+    const halfB = createHalfMesh(sat.value[1], 'prisme_magenta', -0.15);
+
+    // Positionner au même endroit que le satellite
+    const wPos = new THREE.Vector3();
+    sat.mesh.getWorldPosition(wPos);
+    halfA.position.copy(cubeGroup.worldToLocal(wPos.clone()));
+    halfB.position.copy(halfA.position.clone());
+    halfA.position.z = HALF + SAT_LIFT + 0.12;
+    halfB.position.z = HALF + SAT_LIFT + 0.12;
+
+    // Orientation face caméra
+    placeSat(sat, FACE_ROT[0]);
+    halfA.quaternion.copy(sat.mesh.quaternion);
+    halfB.quaternion.copy(sat.mesh.quaternion);
+
+    cubeGroup.add(halfA);
+    cubeGroup.add(halfB);
+
+    // Cacher le satellite original
+    sat.mesh.visible = false;
+
+    prismeState = {
+        sat, halfA, halfB,
+        phase: 'split', // split → idle → recombine
+        t: 0,
+        baseX: sat.lx, baseY: sat.ly,
+        dragHalf: null,
+        dragStart: null,
+    };
+
+    updateUI();
+    return true;
+}
+
+function cancelPrisme(){
+    if(!prismeState) return;
+    const ps = prismeState;
+    // Nettoyer les moitiés
+    cubeGroup.remove(ps.halfA);
+    cubeGroup.remove(ps.halfB);
+    ps.halfA.traverse(c=>{if(c.isMesh){c.geometry.dispose();c.material.dispose();}});
+    ps.halfB.traverse(c=>{if(c.isMesh){c.geometry.dispose();c.material.dispose();}});
+    // Restaurer le satellite
+    ps.sat.mesh.visible = true;
+    prismeState = null;
+    updateUI();
+}
+
+function prismeRecombine(half, targetSat){
+    if(!prismeState) return;
+    const ps = prismeState;
+    const dragIcon = half.userData.iconIdx;
+    const otherHalf = (half === ps.halfA) ? ps.halfB : ps.halfA;
+    const keptIcon = otherHalf.userData.iconIdx;
+
+    // Déterminer quelle face remplacer sur le target
+    // La moitié cyan (face1) remplace face1, magenta (face2) remplace face2
+    const isFace1 = (half === ps.halfA);
+    const oldIcon = isFace1 ? targetSat.value[0] : targetSat.value[1];
+
+    // Appliquer le swap
+    if(isFace1) targetSat.value[0] = dragIcon;
+    else targetSat.value[1] = dragIcon;
+
+    // Mettre à jour la texture du target
+    const st=targetSat.state||'white';
+    const tint=st!=='white'?st:'normal';
+    targetSat.mesh.userData.numMesh.material.map=getDominoTex(targetSat.value[0],targetSat.value[1],tint);
+
+    // Le satellite source récupère l'icône éjectée du target
+    if(isFace1) ps.sat.value[0] = oldIcon;
+    else ps.sat.value[1] = oldIcon;
+
+    // Mettre à jour la texture du satellite source
+    const sst=ps.sat.state||'white';
+    const stint=sst!=='white'?sst:'normal';
+    ps.sat.mesh.userData.numMesh.material.map=getDominoTex(ps.sat.value[0],ps.sat.value[1],stint);
+
+    // Lancer l'animation de recombinaison
+    ps.phase = 'recombine';
+    ps.t = 0;
+    ps.recombineTarget = targetSat;
+    ps.draggedHalf = half;
+    ps.keptHalf = otherHalf;
+}
+
+function tickPrismeAnim(dt, t){
+    if(!prismeState) return;
+    const ps = prismeState;
+    ps.t += dt;
+
+    if(ps.phase === 'split'){
+        // Séparation : les deux moitiés s'écartent verticalement
+        const p = Math.min(1, ps.t / 0.4);
+        const ease = 1 - Math.pow(1 - p, 3);
+        const spread = 0.35 * ease;
+
+        ps.halfA.position.x = ps.baseX;
+        ps.halfA.position.y = ps.baseY + spread;
+        ps.halfB.position.x = ps.baseX;
+        ps.halfB.position.y = ps.baseY - spread;
+
+        // Effet de dispersion chromatique — rotation légère
+        const rotA = ease * 0.08;
+        const baseQ = ps.sat.baseQuat || new THREE.Quaternion();
+        ps.halfA.quaternion.copy(baseQ).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, rotA)));
+        ps.halfB.quaternion.copy(baseQ).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -rotA)));
+
+        // Opacité progressive
+        ps.halfA.children.forEach(c=>{if(c.material)c.material.opacity=0.3+0.7*ease;});
+        ps.halfB.children.forEach(c=>{if(c.material)c.material.opacity=0.3+0.7*ease;});
+
+        if(p >= 1) ps.phase = 'idle';
+    }
+    else if(ps.phase === 'idle'){
+        // Pulse doux des deux moitiés
+        const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+        const sc = 1 + pulse * 0.03;
+        ps.halfA.scale.set(sc, sc, 1);
+        ps.halfB.scale.set(sc, sc, 1);
+    }
+    else if(ps.phase === 'recombine'){
+        // La moitié draggée disparaît vers le target, l'autre revient au centre
+        const p = Math.min(1, ps.t / 0.35);
+        const ease = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+
+        // La moitié draggée va vers le target
+        if(ps.recombineTarget && ps.draggedHalf){
+            const tx = ps.recombineTarget.lx;
+            const ty = ps.recombineTarget.ly;
+            const fx = ps.draggedHalf.position.x;
+            const fy = ps.draggedHalf.position.y;
+            ps.draggedHalf.position.x = fx + (tx - fx) * ease;
+            ps.draggedHalf.position.y = fy + (ty - fy) * ease;
+            ps.draggedHalf.scale.set(1 - ease * 0.5, 1 - ease * 0.5, 1);
+            ps.draggedHalf.children.forEach(c=>{if(c.material)c.material.opacity=1-ease;});
         }
 
-        const pilePool = buildBalancedPool(iconKeys, TOTAL * 2, rng);
-        const facePool = buildBalancedPool(iconKeys, TOTAL * 2, rng);
-
-        // Phase 1 : Créer halfFaces
-        for (let i = 0; i < TOTAL; i++) {
-            const { x, y } = getPos(i);
-            const topId = ++halfIdCounter;
-            const botId = ++halfIdCounter;
-            const pileIdx = i * 2;
-
-            let pileTop = pilePool[pileIdx];
-            let pileBot = pilePool[pileIdx + 1];
-            let faceTop = facePool[pileIdx];
-            let faceBot = facePool[pileIdx + 1];
-
-            // Contrainte : pile ≠ face pour chaque demi-face
-            if (faceTop === pileTop) {
-                const others = iconKeys.filter(k => k !== pileTop);
-                faceTop = others[Math.floor(rng() * others.length)];
-            }
-            if (faceBot === pileBot) {
-                const others = iconKeys.filter(k => k !== pileBot);
-                faceBot = others[Math.floor(rng() * others.length)];
-            }
-
-            halfFaces[topId] = { id: topId, pileIcon: pileTop, faceIcon: faceTop, pileState: 'white', faceState: 'white' };
-            halfFaces[botId] = { id: botId, pileIcon: pileBot, faceIcon: faceBot, pileState: 'white', faceState: 'white' };
-            cells[i] = { topHalfId: topId, bottomHalfId: botId, rotation: ((x + y) % 2 === 0) ? 0 : 90, flipped: false };
+        // L'autre moitié revient au centre
+        if(ps.keptHalf){
+            const cx = ps.baseX;
+            const cy = ps.baseY;
+            const fx = ps.keptHalf.position.x;
+            const fy = ps.keptHalf.position.y;
+            ps.keptHalf.position.x = fx + (cx - fx) * ease;
+            ps.keptHalf.position.y = fy + (cy - fy) * ease;
+            ps.keptHalf.children.forEach(c=>{if(c.material)c.material.opacity=1-ease*0.5;});
         }
 
-        render();
-    }
-
-    function setLevel(level) {
-        if (isAnimating) return;
-        currentLevel = level;
-        document.querySelectorAll('.level-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.level-btn')[level - 1].classList.add('active');
-        resetGame();
-    }
-
-    // ============================================
-    // UI TOGGLES
-    // ============================================
-    function toggleMenu() { document.getElementById('settings-layer').classList.toggle('active'); }
-    function toggleBottomMenu() {
-        const menu = document.getElementById('bottom-menu');
-        const btn = document.getElementById('bottom-toggle');
-        const isOpen = menu.classList.toggle('open');
-        btn.classList.toggle('open', isOpen);
-        btn.textContent = isOpen ? '╳' : '━';
-    }
-    function toggleNotes() { document.getElementById('notes-panel').classList.toggle('active'); }
-    function toggleNumbers() {
-        showNumbers = !showNumbers;
-        const btn = document.getElementById('nb-btn');
-        btn.style.borderColor = showNumbers ? '#22d3ee' : '';
-        btn.style.color = showNumbers ? '#22d3ee' : '';
-        render();
-    }
-    function togglePointsAnimation() {
-        showPointsAnimation = !showPointsAnimation;
-        document.getElementById('points-anim-toggle').classList.toggle('active', showPointsAnimation);
-    }
-    function toggleBackLayer() {
-        showBackLayer = !showBackLayer;
-        document.getElementById('game-container').classList.toggle('show-back-layer', showBackLayer);
-        const btn = document.getElementById('bl-btn');
-        btn.style.borderColor = showBackLayer ? '#22d3ee' : '';
-        btn.style.color = showBackLayer ? '#22d3ee' : '';
-    }
-    function toggleTwinFusion() {
-        enableTwinFusion = !enableTwinFusion;
-        document.getElementById('twin-toggle').classList.toggle('active', enableTwinFusion);
-    }
-    function toggleRespawn() {
-        enableRespawn = !enableRespawn;
-        const btn = document.getElementById('respawn-btn');
-        btn.style.borderColor = enableRespawn ? '' : '#f87171';
-        btn.style.color = enableRespawn ? '' : '#f87171';
-        btn.textContent = enableRespawn ? '♻️' : '🚫';
-    }
-    function toggleDualState() {
-        dualStateMode = !dualStateMode;
-        const btn = document.getElementById('dual-btn');
-        btn.style.borderColor = dualStateMode ? '#f59e0b' : '';
-        btn.style.color = dualStateMode ? '#f59e0b' : '';
-        render();
-    }
-    function toggleInheritRespawn() {
-        inheritRespawn = !inheritRespawn;
-        const btn = document.getElementById('inherit-btn');
-        btn.style.borderColor = inheritRespawn ? '#a78bfa' : '';
-        btn.style.color = inheritRespawn ? '#a78bfa' : '';
-    }
-
-    function setBorderOpacity(val) {
-        const v = val / 100;
-        document.getElementById('border-val').textContent = val + '%';
-        let styleEl = document.getElementById('border-opacity-style');
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = 'border-opacity-style';
-            document.head.appendChild(styleEl);
+        if(p >= 1){
+            // Nettoyer et restaurer
+            cubeGroup.remove(ps.halfA);
+            cubeGroup.remove(ps.halfB);
+            ps.halfA.traverse(c=>{if(c.isMesh){c.geometry.dispose();c.material.dispose();}});
+            ps.halfB.traverse(c=>{if(c.isMesh){c.geometry.dispose();c.material.dispose();}});
+            ps.sat.mesh.visible = true;
+            prismeState = null;
+            assignFaces(); refreshZoom(); updateUI();
         }
-        styleEl.textContent = `
-            .domino .face { border-color: rgba(180,180,190,${0.35 * v}) !important; }
-            .domino .face.top { border-bottom-color: rgba(180,180,190,${0.12 * v}) !important; }
-            .domino.empty .face { border-color: rgba(180,180,190,${0.2 * v}) !important; }
-        `;
     }
+}
 
-    // ============================================
-    // EVENT LISTENERS
-    // ============================================
-    grid.addEventListener('mousedown', startDrag);
-    grid.addEventListener('touchstart', startDrag, { passive: false });
-    document.addEventListener('mousemove', moveDrag);
-    document.addEventListener('touchmove', moveDrag, { passive: false });
-    document.addEventListener('mouseup', endDrag);
-    document.addEventListener('touchend', endDrag);
+// ═══ PRISME — hit test sur les moitiés ═══
 
-    // INIT
-    updateDimensions();
-    resetGame();
-    </script>
+function getPrismeHalfAt(cx, cy){
+    if(!prismeState) return null;
+    const r=canvas.getBoundingClientRect();
+    mouse.x=((cx-r.left)/r.width)*2-1;
+    mouse.y=-((cy-r.top)/r.height)*2+1;
+    raycaster.setFromCamera(mouse, camera);
+    const meshes=[];
+    [prismeState.halfA, prismeState.halfB].forEach(h=>{
+        h.traverse(c=>{if(c.isMesh)meshes.push(c);});
+    });
+    for(const hit of raycaster.intersectObjects(meshes, false)){
+        let o=hit.object;
+        while(o){
+            if(o===prismeState.halfA) return prismeState.halfA;
+            if(o===prismeState.halfB) return prismeState.halfB;
+            o=o.parent;
+        }
+    }
+    return null;
+}
+
+// ═══ TILT (gravité par inclinaison) ═══
+
+let tiltAnim = null;
+
+function tiltGravity(dirY){
+    if(busy||isAnimating||swapAnim||tiltAnim||prismeState) return false;
+    const fIdx = mod(currentIdx);
+    const faceSats = sats.filter(s => s.tableau === fIdx && !s.locked);
+    if(faceSats.length === 0) return false;
+    
+    const gravity = -dirY;
+    faceSats.sort((a,b) => gravity > 0 ? b.ly - a.ly : a.ly - b.ly);
+    
+    const occupied = new Set();
+    occupied.add('0|0');
+    sats.forEach(s => {
+        if(s.tableau === fIdx && s.locked) occupied.add(Math.round(s.lx*100)+'|'+Math.round(s.ly*100));
+    });
+    
+    const moves = [];
+    faceSats.forEach(s => {
+        const key = () => Math.round(s.lx*100)+'|'+Math.round(s.ly*100);
+        occupied.delete(key());
+        let newY = s.ly;
+        const targetY = s.ly + gravity * GAP;
+        const targetKey = Math.round(s.lx*100)+'|'+Math.round(targetY*100);
+        if(!occupied.has(targetKey)) newY = targetY;
+        if(newY !== s.ly) moves.push({sat: s, fromX: s.lx, fromY: s.ly, toX: s.lx, toY: newY});
+        s.ly = newY;
+        occupied.add(Math.round(s.lx*100)+'|'+Math.round(s.ly*100));
+    });
+    
+    if(moves.length === 0) return false;
+    
+    tiltAnim = {
+        moves, gravity, t: 0, phase: 'tilt',
+        tiltAngle: gravity > 0 ? -0.22 : 0.22,
+        origQuat: cubeGroup.quaternion.clone(),
+    };
+    return true;
+}
+
+function tickTiltAnim(dt){
+    if(!tiltAnim) return;
+    const ta = tiltAnim;
+    ta.t += dt;
+    
+    if(ta.phase === 'tilt'){
+        const p = Math.min(1, ta.t / 0.2);
+        const ease = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+        const angle = ta.tiltAngle * ease;
+        const tiltQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), angle);
+        cubeGroup.quaternion.copy(ta.origQuat).multiply(tiltQ);
+        if(p >= 1){ ta.phase = 'slide'; ta.t = 0; }
+    }
+    else if(ta.phase === 'slide'){
+        const p = Math.min(1, ta.t / 0.3);
+        const ease = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+        ta.moves.forEach(m => {
+            m.sat.mesh.position.y = m.fromY + (m.toY - m.fromY) * ease;
+        });
+        if(p >= 1){
+            ta.moves.forEach(m => { placeSat(m.sat, FACE_ROT[0]); });
+            ta.phase = 'recover'; ta.t = 0;
+        }
+    }
+    else if(ta.phase === 'recover'){
+        const p = Math.min(1, ta.t / 0.3);
+        const ease = 1 - Math.pow(1 - p, 3);
+        const angle = ta.tiltAngle * (1 - ease);
+        const tiltQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), angle);
+        cubeGroup.quaternion.copy(ta.origQuat).multiply(tiltQ);
+        if(p >= 1){
+            cubeGroup.quaternion.copy(ta.origQuat);
+            tiltAnim = null;
+            assignFaces(); refreshZoom(); updateUI();
+        }
+    }
+}
+
+// ═══ RENDER ═══
+
+const clock=new THREE.Clock();
+let lastTime=0;
+let flipProgress=0;
+let flipMidSwapped=false;
+function animate(){
+    requestAnimationFrame(animate);const t=clock.getElapsedTime();const dt=t-lastTime;lastTime=t;
+    if(isAnimating){
+        if(flipDir!==0){
+            flipProgress=Math.min(1, flipProgress+dt*1.8);
+            const ease=flipProgress<0.5?2*flipProgress*flipProgress:(1-Math.pow(-2*flipProgress+2,2)/2);
+            const angle=ease*Math.PI*flipDir;
+            cubeGroup.quaternion.setFromAxisAngle(new THREE.Vector3(1,0,0), angle);
+            // À 90° (invisible) : swap texture porte pour que l'arrivée à 180° = visuellement identique
+            if(!flipMidSwapped && ease>=0.5){
+                flipMidSwapped=true;
+                updatePorte([porteValue[1],porteValue[0]]);
+            }
+            if(flipProgress>=1){
+                cubeGroup.quaternion.identity();targetQuat.identity();
+                flipProgress=0;flipMidSwapped=false;onRotationComplete();
+            }
+        } else {
+            cubeGroup.quaternion.slerp(targetQuat,0.12);
+            if(1-Math.abs(cubeGroup.quaternion.dot(targetQuat))<0.0001){cubeGroup.quaternion.copy(targetQuat);onRotationComplete();}
+        }
+    }
+    tickSwapAnim(dt);
+    tickTiltAnim(dt);
+    tickPrismeAnim(dt, t);
+    tickBg(t, dt);
+    // Halo ice pulse
+    const hp=0.5+0.5*Math.sin(t*1.8);
+    haloSpriteMat.opacity=0.4+hp*0.35;
+    camera.position.x+=(targetCamX-camera.position.x)*0.08;
+    camera.position.z+=(targetCamZ-camera.position.z)*0.08;
+    camera.lookAt(camera.position.x, 0, 0);
+    const fIdx=mod(currentIdx);
+    // Trouver le satellite sous le flottant (le plus proche sur le tableau courant)
+    let hoveredSat=null;
+    if(lockedSat){
+        const wp=new THREE.Vector3();lockedSat.mesh.getWorldPosition(wp);
+        const lp=cubeGroup.worldToLocal(wp.clone());
+        let bestD=GAP*0.9, bestS=null;
+        sats.forEach(s=>{
+            if(s===lockedSat||s.locked||s.tableau!==fIdx)return;
+            const d=Math.hypot(s.lx-lp.x,s.ly-lp.y);
+            if(d<bestD){bestD=d;bestS=s;}
+        });
+        hoveredSat=bestS;
+    }
+    sats.forEach((sat,si)=>{const ud=sat.mesh.userData;
+        // ── Micro-tilt respiration (chaque domino a un offset unique) ──
+        if(sat.mesh.visible && !sat.locked && !isAnimating && !swapAnim && sat.baseQuat){
+            const phase = t*1.2 + si*1.7;
+            const tiltX = Math.sin(phase) * 0.012;
+            const tiltY = Math.cos(phase*0.7) * 0.008;
+            const breathQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(tiltX, 0, tiltY));
+            sat.mesh.quaternion.copy(sat.baseQuat).multiply(breathQ);
+        }
+        if(sat.locked){sat.mesh.visible=true;const p=0.5+0.5*Math.sin(t*3.5);
+            ud.glowMesh.material.opacity=0.2+p*0.35;ud.haloMesh.material.opacity=0.05+p*0.1;
+            ud.numMesh.material.map=getDominoTex(sat.value[0],sat.value[1],'cyan');
+            ud.edgeLines.material.color.set(0x5eefff);ud.edgeLines.material.opacity=0.35;
+        } else {
+            // Masquer si position source OU si sous le flottant
+            if(isHiddenBySrc(sat)||sat===hoveredSat){sat.mesh.visible=false;}
+            else if(!isAnimating){sat.mesh.visible=(sat.tableau===fIdx);}
+            ud.glowMesh.material.opacity=0;ud.haloMesh.material.opacity=0;
+            const st=sat.state||'white';
+            let tint=(st!=='white'?st:'normal');
+            ud.numMesh.material.map=getDominoTex(sat.value[0],sat.value[1],tint);
+            // Edge + glow selon state
+            if(st==='cosmic'){
+                // Cosmic : bordure cycle violet→cyan→rose, halo pulsant violet
+                const cPhase=t*1.5+si;
+                const cr=Math.sin(cPhase)*0.5+0.5, cg=Math.sin(cPhase+2.1)*0.5+0.5, cb=Math.sin(cPhase+4.2)*0.5+0.5;
+                ud.edgeLines.material.color.setRGB(0.5+cr*0.5, cg*0.5, 0.5+cb*0.5);
+                ud.edgeLines.material.opacity=0.35+Math.sin(t*2)*0.1;
+                const cp=0.3+0.2*Math.sin(t*2+si);
+                ud.glowMesh.material.color.set(0x8338ec);ud.glowMesh.material.opacity=cp;
+                ud.haloMesh.material.color.set(0x8338ec);ud.haloMesh.material.opacity=cp*0.4;
+            } else if(st==='supernovae'){
+                // Supernovae : bordure cycle orange→doré→jaune, halo pulsant intense
+                const sPhase=t*2+si;
+                const sr=1, sg=0.4+Math.sin(sPhase)*0.35, sb=Math.sin(sPhase*0.7)*0.15;
+                ud.edgeLines.material.color.setRGB(sr, sg, sb);
+                ud.edgeLines.material.opacity=0.4+Math.sin(t*2.5)*0.15;
+                const sp=0.4+0.25*Math.sin(t*2.5+si);
+                ud.glowMesh.material.color.set(0xff8c00);ud.glowMesh.material.opacity=sp;
+                ud.haloMesh.material.color.set(0xffd700);ud.haloMesh.material.opacity=sp*0.5;
+            } else {
+                const eCol = st==='silver'?0x22d3ee : st==='gold'?0xffd700 : st==='emerald'?0x34d399 : 0x7ec8e3;
+                ud.edgeLines.material.color.set(eCol);
+                ud.edgeLines.material.opacity=0.18;
+            }
+        }
+    });
+    renderer.render(scene,camera);
+}
+assignFaces();updateUI();animate();
+</script>
 </body>
 </html>
