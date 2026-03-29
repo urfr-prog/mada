@@ -110,8 +110,8 @@ function drawIcon(ctx, iconIdx, cx, cy, sz, color) {
 // ═══ DOMINO TEXTURE — médiane verticale, néon, tout Canvas2D ═══
 
 const _dtc = {};
-function getDominoTex(leftIdx, rightIdx, tint) {
-    const k = leftIdx+'|'+rightIdx+'|'+tint;
+function getDominoTex(leftIdx, rightIdx, tint, noIcons) {
+    const k = leftIdx+'|'+rightIdx+'|'+tint+(noIcons?'|empty':'');
     if (_dtc[k]) return _dtc[k];
 
     const S = 512;
@@ -154,16 +154,18 @@ function getDominoTex(leftIdx, rightIdx, tint) {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Séparateur horizontal (médiane)
-    ctx.strokeStyle = sep; ctx.lineWidth = 2.5;
-    ctx.shadowColor = sep; ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.moveTo(m+16, S/2); ctx.lineTo(S-m-16, S/2); ctx.stroke();
-    ctx.shadowBlur = 0;
+    if(!noIcons){
+        // Séparateur horizontal (médiane)
+        ctx.strokeStyle = sep; ctx.lineWidth = 2.5;
+        ctx.shadowColor = sep; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.moveTo(m+16, S/2); ctx.lineTo(S-m-16, S/2); ctx.stroke();
+        ctx.shadowBlur = 0;
 
-    // Icônes — haut et bas
-    const iconSz = S * 0.42;
-    drawIcon(ctx, leftIdx,  S*0.5, S*0.25, iconSz, iconC);
-    drawIcon(ctx, rightIdx, S*0.5, S*0.75, iconSz, iconC);
+        // Icônes — haut et bas
+        const iconSz = S * 0.42;
+        drawIcon(ctx, leftIdx,  S*0.5, S*0.25, iconSz, iconC);
+        drawIcon(ctx, rightIdx, S*0.5, S*0.75, iconSz, iconC);
+    }
 
     const tex = new THREE.CanvasTexture(cv);
     _dtc[k] = tex;
@@ -310,7 +312,7 @@ function tickFusionAnim(dt){
             fa.percute.value = [remainPercute, remainPercuteur];
             // Mettre à jour la texture
             const tint = newState !== 'white' ? newState : 'normal';
-            fa.percute.mesh.userData.numMesh.material.map = getDominoTex(fa.percute.value[0], fa.percute.value[1], tint);
+            fa.percute.mesh.userData.numMesh.material.map = getSatTex(fa.percute.value, tint, newState);
             // Marquer le percuteur comme "mort" — le retirer du tableau
             fa.percuteur.tableau = -1;
             fa.percuteur.lx = 99; fa.percuteur.ly = 99;
@@ -474,15 +476,21 @@ function updatePorte(val){porteValue=val;const tex=makePorteTex(val);cubeMats.fo
 // ═══ SATELLITES — un seul plane texturé, pas de double carré ═══
 
 const sats=[];
+// Helper : texture satellite — plasma = pas d'icônes
+function getSatTex(value, tint, state){
+    const noIcons = (state === 'plasma');
+    return getDominoTex(value[0], value[1], tint, noIcons);
+}
+
 const SAT_DEPTH = 0.06;  // épaisseur du domino
 const SAT_LIFT = 0.08;   // hauteur de flottement au-dessus de la face
-function createSatMesh(value,tint){
+function createSatMesh(value,tint,state){
     const grp=new THREE.Group(), SZ=1.0, R=0.12;
 
     // ── Face avant (texture domino) ──
     const nMesh=new THREE.Mesh(
         new THREE.PlaneGeometry(SZ, SZ),
-        new THREE.MeshBasicMaterial({map:getDominoTex(value[0],value[1],tint||'normal'),transparent:true})
+        new THREE.MeshBasicMaterial({map:getSatTex(value,tint||'normal',state),transparent:true})
     );
     nMesh.position.z = SAT_DEPTH/2 + 0.001; // devant la box
     grp.add(nMesh);
@@ -532,7 +540,7 @@ function createSatMesh(value,tint){
 
 TABLEAUX.forEach((tab,tIdx)=>{tab.sats.forEach((sd,sIdx)=>{
     const st=sd.state||'white';
-    const mesh=createSatMesh(sd.v,st!=='white'?st:undefined);mesh.visible=false;cubeGroup.add(mesh);
+    const mesh=createSatMesh(sd.v,st!=='white'?st:undefined,st);mesh.visible=false;cubeGroup.add(mesh);
     sats.push({id:tIdx*100+sIdx,value:sd.v,state:st,tableau:tIdx,origTableau:tIdx,lx:sd.x,ly:sd.y,origLx:sd.x,origLy:sd.y,locked:false,mesh});
 });});
 
@@ -605,7 +613,7 @@ function onRotationComplete(){
                 s.value=[s.value[1],s.value[0]];
                 const st=s.state||'white';
                 const tint=st!=='white'?st:'normal';
-                s.mesh.userData.numMesh.material.map=getDominoTex(s.value[0],s.value[1],tint);
+                s.mesh.userData.numMesh.material.map=getSatTex(s.value,tint,st);
             }
         });
         // Inverser aussi la porte
@@ -825,7 +833,7 @@ function tickSwapAnim(dt){
             updatePorte(swapAnim.oldSat);
             target.value=swapAnim.oldPorte;
             const tst=target.state||'white';
-            target.mesh.userData.numMesh.material.map=getDominoTex(target.value[0],target.value[1],tst!=='white'?tst:'normal');
+            target.mesh.userData.numMesh.material.map=getSatTex(target.value,tst!=='white'?tst:'normal',tst);
             cubeGroup.remove(swapAnim.ghost);
             swapAnim.ghost.geometry.dispose();
             swapAnim.ghost.material.dispose();
@@ -1006,7 +1014,7 @@ document.getElementById('btnReset').addEventListener('click',()=>{
         if(sat.mesh.parent!==cubeGroup)cubeGroup.attach(sat.mesh);sat.mesh.scale.set(1,1,1);
         const ud=sat.mesh.userData;ud.glowMesh.material.opacity=0;ud.haloMesh.material.opacity=0;
         const tint=(sat.state!=='white')?sat.state:'normal';
-        ud.numMesh.material.map=getDominoTex(sd.v[0],sd.v[1],tint);
+        ud.numMesh.material.map=getSatTex(sd.v,tint,sat.state);
     });});
     updatePorte([4,2]);cubeGroup.quaternion.identity();targetQuat.identity();
     currentIdx=0;isAnimating=false;busy=false;navDir=0;flipDir=0;isFlipped=false;
@@ -1105,7 +1113,7 @@ function animate(){
         }
         if(sat.locked){sat.mesh.visible=true;const p=0.5+0.5*Math.sin(t*3.5);
             ud.glowMesh.material.opacity=0.2+p*0.35;ud.haloMesh.material.opacity=0.05+p*0.1;
-            ud.numMesh.material.map=getDominoTex(sat.value[0],sat.value[1],'cyan');
+            ud.numMesh.material.map=getSatTex(sat.value,'cyan',sat.state);
             ud.edgeLines.material.color.set(0x5eefff);ud.edgeLines.material.opacity=0.35;
         } else {
             // Masquer si position source OU si sous le flottant
@@ -1114,7 +1122,7 @@ function animate(){
             ud.glowMesh.material.opacity=0;ud.haloMesh.material.opacity=0;
             const st=sat.state||'white';
             let tint=(st!=='white'?st:'normal');
-            ud.numMesh.material.map=getDominoTex(sat.value[0],sat.value[1],tint);
+            ud.numMesh.material.map=getSatTex(sat.value,tint,st);
             // Edge color matches state
             const eCol = st==='silver'?0x22d3ee : st==='gold'?0xffd700 : st==='emerald'?0x34d399 : st==='nova'?0xfb923c : st==='plasma'?0xc084fc : 0x7ec8e3;
             ud.edgeLines.material.color.set(eCol);
